@@ -65,24 +65,35 @@ router.get('/', protect, async (req, res, next) => {
       .sort({ updatedAt: -1 })
       .lean();
 
-    // If student has no documents initialized, create the 4 standard required documents
-    if (req.user.role === ROLES.STUDENT && docs.length === 0) {
-      const defaultTypes = [
-        DOCUMENT_TYPES.MARKSHEET_10TH,
-        DOCUMENT_TYPES.MARKSHEET_12TH,
-        DOCUMENT_TYPES.TRANSFER_CERTIFICATE,
-        DOCUMENT_TYPES.IDENTITY_PROOF,
+    // Ensure all 8 standard university admission documents are provisioned for student
+    if (req.user.role === ROLES.STUDENT) {
+      const universityDocDefinitions = [
+        { type: DOCUMENT_TYPES.IDENTITY_PROOF, required: true },
+        { type: DOCUMENT_TYPES.MARKSHEET_10TH, required: true },
+        { type: DOCUMENT_TYPES.MARKSHEET_12TH, required: true },
+        { type: DOCUMENT_TYPES.TRANSFER_CERTIFICATE, required: true },
+        { type: DOCUMENT_TYPES.MIGRATION_CERTIFICATE, required: true },
+        { type: DOCUMENT_TYPES.PASSPORT_PHOTO, required: true },
+        { type: DOCUMENT_TYPES.INCOME_CERTIFICATE, required: false },
+        { type: DOCUMENT_TYPES.CATEGORY_CERTIFICATE, required: false },
       ];
 
-      for (const dt of defaultTypes) {
-        await Document.create({
+      for (const def of universityDocDefinitions) {
+        const exists = await Document.findOne({
           student: req.student._id,
-          trackingId: req.student.trackingId,
-          application: req.student.currentApplication,
-          documentType: dt,
-          status: DOCUMENT_STATUS.NOT_UPLOADED,
-          isRequired: true,
+          documentType: def.type,
         });
+
+        if (!exists) {
+          await Document.create({
+            student: req.student._id,
+            trackingId: req.student.trackingId,
+            application: req.student.currentApplication,
+            documentType: def.type,
+            status: DOCUMENT_STATUS.NOT_UPLOADED,
+            isRequired: def.required,
+          });
+        }
       }
 
       docs = await Document.find({ student: req.student._id })

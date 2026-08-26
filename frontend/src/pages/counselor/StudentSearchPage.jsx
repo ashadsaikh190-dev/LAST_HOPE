@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { Search, User, FileText, IdCard, ShieldCheck, ArrowRight, Loader2, Sparkles } from 'lucide-react';
@@ -9,13 +9,10 @@ export const StudentSearchPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSearch = async (e) => {
-    e?.preventDefault();
-    if (!query.trim()) return;
-
+  const fetchSearchResults = async (searchQuery = '') => {
     setLoading(true);
     try {
-      const res = await api.get(`/counselor/search?q=${encodeURIComponent(query.trim())}`);
+      const res = await api.get(`/counselor/search?q=${encodeURIComponent(searchQuery)}`);
       if (res.data.success) {
         setResults(res.data.data);
       }
@@ -24,6 +21,15 @@ export const StudentSearchPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchSearchResults('');
+  }, []);
+
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    fetchSearchResults(query.trim());
   };
 
   const students = results?.students || [];

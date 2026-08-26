@@ -82,13 +82,14 @@ export const UploadModal = ({ isOpen, onClose, documentType: initialDocType, onU
               onChange={(e) => setSelectedType(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-brand-500 outline-none"
             >
-              <option value="MARKSHEET_10TH">10th Standard Marksheet</option>
-              <option value="MARKSHEET_12TH">12th Standard Marksheet</option>
-              <option value="TRANSFER_CERTIFICATE">Transfer Certificate / Migration</option>
-              <option value="IDENTITY_PROOF">Identity Proof (Aadhaar / Passport / ID)</option>
-              <option value="INCOME_CERTIFICATE">Income Certificate</option>
-              <option value="CASTE_CERTIFICATE">Caste / Category Certificate</option>
-              <option value="OTHER">Other Academic Record</option>
+              <option value="IDENTITY_PROOF">🪪 Aadhaar Card / Government Identity Proof</option>
+              <option value="MARKSHEET_10TH">📄 10th Standard Marksheet & Passing Certificate</option>
+              <option value="MARKSHEET_12TH">📄 12th Standard Marksheet & Passing Certificate</option>
+              <option value="TRANSFER_CERTIFICATE">📜 School / College Transfer Certificate (TC)</option>
+              <option value="MIGRATION_CERTIFICATE">🏛️ Board / University Migration Certificate</option>
+              <option value="PASSPORT_PHOTO">📸 Passport Size Color Photograph</option>
+              <option value="INCOME_CERTIFICATE">📋 Income & Asset Certificate (Fee Waiver)</option>
+              <option value="CATEGORY_CERTIFICATE">⚖️ Caste / Category Quota Certificate</option>
             </select>
           </div>
         )}

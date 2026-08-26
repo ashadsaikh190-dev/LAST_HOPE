@@ -18,6 +18,49 @@ import {
   Cpu,
 } from 'lucide-react';
 
+const DOC_META = {
+  IDENTITY_PROOF: {
+    title: 'Aadhaar Card / Government Identity Proof',
+    desc: 'Government photo identification (Aadhaar, Passport, or Voter ID) for identity & DOB verification.',
+    icon: '🪪',
+  },
+  MARKSHEET_10TH: {
+    title: '10th Standard Marksheet & Certificate',
+    desc: 'Secondary school examination certificate showing full subjects, marks, and date of birth.',
+    icon: '📄',
+  },
+  MARKSHEET_12TH: {
+    title: '12th Standard Marksheet & Passing Certificate',
+    desc: 'Higher secondary marksheet with Physics, Chemistry, Math/Bio scores for program eligibility.',
+    icon: '📄',
+  },
+  TRANSFER_CERTIFICATE: {
+    title: 'School / College Transfer Certificate (TC)',
+    desc: 'Official institutional transfer / school leaving certificate from last attended institution.',
+    icon: '📜',
+  },
+  MIGRATION_CERTIFICATE: {
+    title: 'Board / University Migration Certificate',
+    desc: 'Migration certificate issued by your school examination board or university council.',
+    icon: '🏛️',
+  },
+  PASSPORT_PHOTO: {
+    title: 'Passport Size Color Photograph',
+    desc: 'Recent passport size color photograph with white background for official student enrollment card.',
+    icon: '📸',
+  },
+  INCOME_CERTIFICATE: {
+    title: 'Income & Asset Certificate',
+    desc: 'Annual family income certificate for fee waiver, concession, or scholarship review.',
+    icon: '📋',
+  },
+  CATEGORY_CERTIFICATE: {
+    title: 'Caste / Category Quota Certificate',
+    desc: 'SC/ST/OBC/EWS category reservation certificate issued by competent revenue authority.',
+    icon: '⚖️',
+  },
+};
+
 export const DocumentsPage = () => {
   const { socket } = useSocket();
   const [documents, setDocuments] = useState([]);
@@ -140,27 +183,39 @@ export const DocumentsPage = () => {
             const isNotUploaded = doc.status === 'NOT_UPLOADED';
 
             const verif = doc.verification;
+            const meta = DOC_META[doc.documentType] || {
+              title: doc.documentType?.replace(/_/g, ' '),
+              desc: 'Academic certification for university admissions.',
+              icon: '📄',
+            };
 
             return (
               <div
                 key={doc._id}
-                className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4"
+                className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
               >
               {/* Document Header */}
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-brand-600 uppercase tracking-wider block">
-                    {doc.isRequired ? 'Mandatory Document' : 'Optional Document'}
-                  </span>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {doc.documentType?.replace(/_/g, ' ')}
-                  </h3>
-                  {doc.currentVersion && (
-                    <span className="inline-block text-[11px] text-slate-400 font-mono">
-                      Current Version: <strong>v{doc.currentVersion.versionNumber || 1}</strong> (
-                      {doc.currentVersion.fileName})
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-50 border border-brand-100 text-xl shadow-sm">
+                    {meta.icon}
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-brand-600 uppercase tracking-wider block">
+                      {doc.isRequired ? 'Mandatory Admission Document' : 'Optional / Quota Document'}
                     </span>
-                  )}
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                      {meta.title}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 line-clamp-2">
+                      {meta.desc}
+                    </p>
+                    {doc.currentVersion && (
+                      <span className="inline-block text-[11px] text-brand-700 font-mono mt-1 font-semibold">
+                        Current: <strong>v{doc.currentVersion.versionNumber || 1}</strong> ({doc.currentVersion.fileName})
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Status Badge */}
