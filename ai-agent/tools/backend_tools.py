@@ -30,8 +30,11 @@ class BackendToolClient:
                     headers=headers,
                 )
                 if response.status_code == 200:
-                    data = response.json()
-                    return data.get("data", {})
+                    res_json = response.json()
+                    inner = res_json.get("data", {})
+                    if isinstance(inner, dict) and "data" in inner:
+                        return inner["data"]
+                    return inner
                 else:
                     return {"error": f"Backend returned status {response.status_code}: {response.text}"}
         except Exception as e:

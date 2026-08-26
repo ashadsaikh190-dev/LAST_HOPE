@@ -62,12 +62,44 @@ class AdmissionsAgent:
             programs_data = await tool_client.execute_tool("getPrograms", tracking_id=tracking_id)
             tool_calls.append({"toolName": "getPrograms", "result": programs_data, "status": "SUCCESS"})
             
-            # Format real program details
-            if isinstance(programs_data, list) and len(programs_data) > 0:
-                prog_list = "\n".join([f"- **{p.get('name')} ({p.get('code')})**: Tuition ₹{p.get('tuitionFee', 0):,}/yr | Min 12th: {p.get('eligibilityCriteria', {}).get('minTwelfthMarks', 50)}%" for p in programs_data[:4]])
-                reply = f"Here are the active university degree programs:\n\n{prog_list}\n\nWould you like me to start your application for one of these programs?"
+            progs = programs_data if isinstance(programs_data, list) else programs_data.get("data", []) if isinstance(programs_data, dict) else []
+            
+            # Check if user specifically mentioned a program code or keyword
+            msg_upper = message_text.upper()
+            matched_prog = None
+            if isinstance(progs, list):
+                for p in progs:
+                    code = str(p.get("code", "")).upper()
+                    name = str(p.get("name", "")).upper()
+                    dept = str(p.get("department", "")).upper()
+                    if (code and code in msg_upper) or (code == "CSE" and "COMPUTER" in msg_upper) or (code == "AI_DS" and ("AI" in msg_upper or "DATA SCIENCE" in msg_upper)) or (code == "MBA" and "MANAGEMENT" in msg_upper):
+                        matched_prog = p
+                        break
+            
+            if matched_prog:
+                tuition = matched_prog.get("tuitionFee", 0)
+                app_fee = matched_prog.get("applicationFee", 1000)
+                duration = matched_prog.get("durationYears", 4)
+                min_12 = matched_prog.get("eligibilityCriteria", {}).get("minTwelfthMarks", 60)
+                min_10 = matched_prog.get("eligibilityCriteria", {}).get("minTenthMarks", 60)
+                seats = matched_prog.get("seatCapacity", 120)
+                
+                reply = (
+                    f"The official fee schedule for **{matched_prog.get('name')} ({matched_prog.get('code')})** is:\n\n"
+                    f"• **Annual Tuition Fee**: **₹{tuition:,} / year**\n"
+                    f"• **One-Time Application Fee**: **₹{app_fee:,}**\n"
+                    f"• **Total Program Tuition ({duration} Years)**: **₹{tuition * duration:,}**\n\n"
+                    f"📋 **Eligibility & Intake Criteria:**\n"
+                    f"• Minimum 12th Board Marks: **{min_12}% (PCM)**\n"
+                    f"• Minimum 10th Board Marks: **{min_10}%**\n"
+                    f"• Total Approved Seats: **{seats} Seats**\n\n"
+                    f"You can apply directly from your portal or upload your income certificate to check for merit scholarship fee waivers."
+                )
+            elif isinstance(progs, list) and len(progs) > 0:
+                prog_list = "\n".join([f"- **{p.get('name')} ({p.get('code')})**: Tuition ₹{p.get('tuitionFee', 0):,}/yr | Duration: {p.get('durationYears', 4)} yrs | Min 12th: {p.get('eligibilityCriteria', {}).get('minTwelfthMarks', 50)}%" for p in progs])
+                reply = f"Here are the active university degree programs and tuition fees:\n\n{prog_list}\n\nWould you like more details on a specific program like **CSE**, **AI & Data Science**, or **MBA**?"
             else:
-                reply = "Our university offers accredited B.Tech and MBA degrees. Check the catalog in your portal for current intake details."
+                reply = "Our university offers accredited B.Tech and MBA degrees. Annual tuition ranges from ₹85,000 to ₹1,40,000 per year."
 
         elif primary_intent == "DOCUMENT_STATUS":
             verif_data = await tool_client.execute_tool("getVerificationStatus", tracking_id=tracking_id)
