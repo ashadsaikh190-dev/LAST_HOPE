@@ -10,7 +10,7 @@ const Student = require('../models/Student');
 const Application = require('../models/Application');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/role');
-const { ROLES, DOCUMENT_STATUS, DOCUMENT_VERSION_STATUS, LIFECYCLE_STAGES } = require('../config/constants');
+const { ROLES, DOCUMENT_TYPES, DOCUMENT_STATUS, DOCUMENT_VERSION_STATUS, LIFECYCLE_STAGES } = require('../config/constants');
 const { uploadStudentDocument, getDocumentSignedUrl, LOCAL_STORAGE_DIR } = require('../services/s3Service');
 const { queueDocumentProcessing } = require('../services/sqsService');
 const { transitionStudentStage } = require('../services/stateMachineService');
@@ -55,7 +55,7 @@ router.get('/', protect, async (req, res, next) => {
       }
     }
 
-    const docs = await Document.find(query)
+    let docs = await Document.find(query)
       .populate('currentVersion')
       .populate('student', 'firstName lastName email trackingId')
       .populate({
@@ -64,6 +64,31 @@ router.get('/', protect, async (req, res, next) => {
       })
       .sort({ updatedAt: -1 })
       .lean();
+
+    // If student has no documents initialized, create the 4 standard required documents
+    if (req.user.role === ROLES.STUDENT && docs.length === 0) {
+      const defaultTypes = [
+        DOCUMENT_TYPES.MARKSHEET_10TH,
+        DOCUMENT_TYPES.MARKSHEET_12TH,
+        DOCUMENT_TYPES.TRANSFER_CERTIFICATE,
+        DOCUMENT_TYPES.IDENTITY_PROOF,
+      ];
+
+      for (const dt of defaultTypes) {
+        await Document.create({
+          student: req.student._id,
+          trackingId: req.student.trackingId,
+          application: req.student.currentApplication,
+          documentType: dt,
+          status: DOCUMENT_STATUS.NOT_UPLOADED,
+          isRequired: true,
+        });
+      }
+
+      docs = await Document.find({ student: req.student._id })
+        .populate('currentVersion')
+        .lean();
+    }
 
     // Attach latest verification details to each document
     const docsWithVerification = await Promise.all(

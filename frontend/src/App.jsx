@@ -79,11 +79,11 @@ const AppLayout = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/programs" element={<ProgramBrowser />} />
 
-            {/* Student Protected Routes */}
+            {/* Student & Staff Accessible Lifecycle Routes */}
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <StudentDashboard />
                 </ProtectedRoute>
               }
@@ -91,7 +91,7 @@ const AppLayout = () => {
             <Route
               path="/application"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <ApplicationWizard />
                 </ProtectedRoute>
               }
@@ -99,7 +99,7 @@ const AppLayout = () => {
             <Route
               path="/documents"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <DocumentsPage />
                 </ProtectedRoute>
               }
@@ -107,7 +107,7 @@ const AppLayout = () => {
             <Route
               path="/payment"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <PaymentPage />
                 </ProtectedRoute>
               }
@@ -115,7 +115,7 @@ const AppLayout = () => {
             <Route
               path="/admission"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <AdmissionOfferPage />
                 </ProtectedRoute>
               }
@@ -123,7 +123,7 @@ const AppLayout = () => {
             <Route
               path="/enrollment"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <EnrollmentCardPage />
                 </ProtectedRoute>
               }
@@ -131,7 +131,7 @@ const AppLayout = () => {
             <Route
               path="/profile"
               element={
-                <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'ADMIN']}>
                   <StudentProfile />
                 </ProtectedRoute>
               }

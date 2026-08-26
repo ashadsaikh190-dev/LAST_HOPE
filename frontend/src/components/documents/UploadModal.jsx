@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { UploadCloud, X, File, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../../api/axios';
 
-export const UploadModal = ({ isOpen, onClose, documentType, onUploadSuccess }) => {
+export const UploadModal = ({ isOpen, onClose, documentType: initialDocType, onUploadSuccess }) => {
+  const [selectedType, setSelectedType] = useState(initialDocType || 'MARKSHEET_12TH');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+
+  React.useEffect(() => {
+    if (initialDocType) setSelectedType(initialDocType);
+  }, [initialDocType]);
 
   if (!isOpen) return null;
 
@@ -25,13 +30,18 @@ export const UploadModal = ({ isOpen, onClose, documentType, onUploadSuccess }) 
       setError('Please select a file to upload');
       return;
     }
+    const docTypeToUpload = initialDocType || selectedType;
+    if (!docTypeToUpload) {
+      setError('Please select a document type');
+      return;
+    }
 
     setUploading(true);
     setError('');
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('documentType', documentType);
+    formData.append('documentType', docTypeToUpload);
 
     try {
       const response = await api.post('/documents/upload', formData, {
@@ -54,15 +64,34 @@ export const UploadModal = ({ isOpen, onClose, documentType, onUploadSuccess }) 
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Upload Document</h3>
+            <h3 className="text-base font-bold text-slate-900">Upload Student Document</h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Target: <span className="font-semibold text-brand-600">{documentType?.replace(/_/g, ' ')}</span>
+              Target: <span className="font-semibold text-brand-600">{(initialDocType || selectedType)?.replace(/_/g, ' ')}</span>
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {!initialDocType && (
+          <div className="mt-4">
+            <label className="block text-xs font-bold text-slate-700 mb-1">Select Document Type</label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-brand-500 outline-none"
+            >
+              <option value="MARKSHEET_10TH">10th Standard Marksheet</option>
+              <option value="MARKSHEET_12TH">12th Standard Marksheet</option>
+              <option value="TRANSFER_CERTIFICATE">Transfer Certificate / Migration</option>
+              <option value="IDENTITY_PROOF">Identity Proof (Aadhaar / Passport / ID)</option>
+              <option value="INCOME_CERTIFICATE">Income Certificate</option>
+              <option value="CASTE_CERTIFICATE">Caste / Category Certificate</option>
+              <option value="OTHER">Other Academic Record</option>
+            </select>
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">

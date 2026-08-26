@@ -89,28 +89,63 @@ export const DocumentsPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
             {documents.filter((d) => d.status === 'VERIFIED').length}/{documents.length} Verified
           </span>
+          <button
+            onClick={() => setActiveUploadDocType('MARKSHEET_12TH')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-sm shadow-brand-500/20 transition-all cursor-pointer"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>+ Upload Document</span>
+          </button>
         </div>
       </div>
 
-      {/* Documents Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {documents.map((doc) => {
-          const isVerified = doc.status === 'VERIFIED';
-          const isProcessing = doc.status === 'PROCESSING';
-          const isMismatch = doc.status === 'MISMATCH' || doc.status === 'NEEDS_REVIEW';
-          const isNotUploaded = doc.status === 'NOT_UPLOADED';
-
-          const verif = doc.verification;
-
-          return (
-            <div
-              key={doc._id}
-              className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4"
+      {/* Empty State or Loading */}
+      {loading ? (
+        <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 shadow-sm">
+          <RefreshCw className="w-8 h-8 text-brand-600 animate-spin mx-auto mb-3" />
+          <p className="text-xs text-slate-500 font-medium">Loading documents from Amazon S3...</p>
+        </div>
+      ) : documents.length === 0 ? (
+        <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4 max-w-2xl mx-auto">
+          <div className="w-14 h-14 rounded-3xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto">
+            <UploadCloud className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Upload Your Application Documents</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Please upload your 10th marksheet, 12th marksheet, transfer certificate, and identity proof to begin automated Amazon Textract OCR verification.
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center">
+            <button
+              onClick={() => setActiveUploadDocType('MARKSHEET_12TH')}
+              className="px-5 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 inline-flex items-center gap-2"
             >
+              <UploadCloud className="w-4 h-4" />
+              <span>Select & Upload Document</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Documents Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {documents.map((doc) => {
+            const isVerified = doc.status === 'VERIFIED';
+            const isProcessing = doc.status === 'PROCESSING';
+            const isMismatch = doc.status === 'MISMATCH' || doc.status === 'NEEDS_REVIEW';
+            const isNotUploaded = doc.status === 'NOT_UPLOADED';
+
+            const verif = doc.verification;
+
+            return (
+              <div
+                key={doc._id}
+                className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
               {/* Document Header */}
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
@@ -275,6 +310,7 @@ export const DocumentsPage = () => {
           );
         })}
       </div>
+      )}
 
       {/* Upload Modal */}
       <UploadModal
