@@ -53,10 +53,68 @@ export const Navbar = () => {
           </Link>
         </div>
 
-        {/* Middle: Student Tracking ID or Role Context */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Middle: Student Tracking ID or Role Context & Fast Switcher */}
+        <div className="hidden md:flex items-center gap-2">
+          {/* Quick Role Switcher Pills */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
+            <button
+              onClick={async () => {
+                if (user?.role !== 'STUDENT') {
+                  // Switch to student
+                  try {
+                    await login('student@university.edu', 'StudentPassword123!');
+                  } catch (e) {
+                    navigate('/dashboard');
+                  }
+                }
+                navigate('/dashboard');
+              }}
+              className={`px-3 py-1 rounded-xl font-bold transition-all ${
+                isStudent
+                  ? 'bg-white text-brand-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              🎓 Student
+            </button>
+            <button
+              onClick={async () => {
+                if (user?.role !== 'COUNSELOR') {
+                  try {
+                    await login('counselor@university.edu', 'CounselorPassword123!');
+                  } catch (e) {}
+                }
+                navigate('/counselor');
+              }}
+              className={`px-3 py-1 rounded-xl font-bold transition-all ${
+                isCounselor
+                  ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              🧭 Counselor
+            </button>
+            <button
+              onClick={async () => {
+                if (user?.role !== 'ADMIN') {
+                  try {
+                    await login('admin@university.edu', 'AdminPassword123!');
+                  } catch (e) {}
+                }
+                navigate('/admin');
+              }}
+              className={`px-3 py-1 rounded-xl font-bold transition-all ${
+                isAdmin
+                  ? 'bg-white text-amber-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              🛡️ Admin
+            </button>
+          </div>
+
           {isStudent && student?.trackingId && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100/80 border border-slate-200 text-xs">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-xs">
               <span className="text-slate-500 font-medium">Tracking ID:</span>
               <span className="font-mono font-bold text-brand-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                 {student.trackingId}
@@ -69,27 +127,6 @@ export const Navbar = () => {
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
-          )}
-
-          {isStudent && student?.officialEnrollmentNumber && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Enrollment: {student.officialEnrollmentNumber}</span>
-            </div>
-          )}
-
-          {isCounselor && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700">
-              <Compass className="w-3.5 h-3.5" />
-              Counselor Desk
-            </span>
-          )}
-
-          {isAdmin && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-700">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Admin Authority
-            </span>
           )}
         </div>
 

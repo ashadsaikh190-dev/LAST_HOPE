@@ -37,7 +37,8 @@ import { SystemHealthPage } from './pages/admin/SystemHealthPage';
 
 // Protected Route Guard
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, login } = useAuth();
+  const [switching, setSwitching] = React.useState(false);
 
   if (loading) {
     return (
@@ -52,10 +53,60 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    const handleSwitch = async (email, pass) => {
+      try {
+        setSwitching(true);
+        await login(email, pass);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSwitching(false);
+      }
+    };
+
     return (
-      <div className="p-12 text-center">
-        <h2 className="text-lg font-bold text-slate-800">403 - Unauthorized</h2>
-        <p className="text-xs text-slate-500 mt-1">Your user role does not have access to this portal page.</p>
+      <div className="max-w-xl mx-auto my-12 p-8 text-center rounded-3xl bg-white border border-slate-200 shadow-xl space-y-5 animate-fade-in">
+        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+          <span className="text-2xl font-bold">🔒</span>
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-slate-900">403 — Role Permission Required</h2>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            You are currently signed in as <strong className="text-slate-800 font-mono">{user.name}</strong> (Role: <span className="px-2 py-0.5 rounded-full bg-slate-100 font-bold text-slate-700">{user.role}</span>).
+          </p>
+          <p className="text-xs text-slate-400">
+            This workspace requires <strong className="text-brand-600">{allowedRoles.join(' or ')}</strong> privileges.
+          </p>
+        </div>
+
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {allowedRoles.includes('COUNSELOR') && (
+            <button
+              onClick={() => handleSwitch('counselor@university.edu', 'CounselorPassword123!')}
+              disabled={switching}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition-all cursor-pointer"
+            >
+              {switching ? 'Switching...' : '🧭 Switch to Counselor Account'}
+            </button>
+          )}
+
+          {allowedRoles.includes('ADMIN') && (
+            <button
+              onClick={() => handleSwitch('admin@university.edu', 'AdminPassword123!')}
+              disabled={switching}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+            >
+              {switching ? 'Switching...' : '🛡️ Switch to Administrator'}
+            </button>
+          )}
+
+          <Link
+            to="/dashboard"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all text-center"
+          >
+            🎓 Go to Student Portal
+          </Link>
+        </div>
       </div>
     );
   }
