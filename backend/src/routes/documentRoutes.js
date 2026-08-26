@@ -50,8 +50,8 @@ router.get('/', protect, async (req, res, next) => {
         const s = await Student.findOne({ trackingId: req.query.trackingId });
         if (s) query.student = s._id;
       } else {
-        // Fetch all documents with uploaded versions for verification desk
-        query.currentVersion = { $ne: null };
+        // Fetch all documents for verification desk review (MISMATCH, NEEDS_REVIEW, UPLOADED, VERIFIED, REJECTED)
+        query.status = { $ne: DOCUMENT_STATUS.NOT_UPLOADED };
       }
     }
 

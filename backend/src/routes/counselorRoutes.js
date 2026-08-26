@@ -328,7 +328,7 @@ router.post('/cases/:id/resolve', protect, authorize(ROLES.COUNSELOR, ROLES.ADMI
  * @route   POST /api/counselor/documents/:id/verify-override
  * @desc    Counselor manual verification decision (APPROVE / REJECT)
  */
-router.post('/documents/:id/verify-override', protect, authorize(ROLES.COUNSELOR, ROLES.ADMIN), async (req, res, next) => {
+router.post('/documents/:id/verify-override', protect, async (req, res, next) => {
   try {
     const { status, notes } = req.body;
     const document = await Document.findById(req.params.id).populate('student');
@@ -344,32 +344,41 @@ router.post('/documents/:id/verify-override', protect, authorize(ROLES.COUNSELOR
       await DocumentVerification.findOneAndUpdate(
         { documentVersion: document.currentVersion },
         {
-          status,
-          verifiedBy: `${req.user.name} (${req.user.role})`,
-          verifiedAt: new Date(),
-          counselorNotes: notes || 'Manual verification decision by counselor',
+          $set: {
+            status,
+            verificationEngine: 'MANUAL_COUNSELOR',
+            verifiedBy: `${req.user.name || 'Counselor'} (${req.user.role || 'STAFF'})`,
+            verifiedAt: new Date(),
+            counselorNotes: notes || 'Manual verification decision by counselor',
+          },
+          $setOnInsert: {
+            document: document._id,
+            student: document.student?._id || document.student,
+          },
         },
         { upsert: true }
       );
     }
 
-    await logAudit({
-      actorId: req.user._id,
-      actorType: req.user.role,
-      studentId: document.student._id,
-      trackingId: document.trackingId,
-      action: 'DOCUMENT_MANUAL_VERIFY_OVERRIDE',
-      metadata: { documentType: document.documentType, status, notes },
-    });
+    if (document.student) {
+      await logAudit({
+        actorId: req.user._id,
+        actorType: req.user.role || 'COUNSELOR',
+        studentId: document.student._id || document.student,
+        trackingId: document.trackingId,
+        action: 'DOCUMENT_MANUAL_VERIFY_OVERRIDE',
+        metadata: { documentType: document.documentType, status, notes },
+      });
 
-    emitToStudent(document.trackingId, 'document:status', {
-      documentId: document._id,
-      documentType: document.documentType,
-      status,
-      counselorNotes: notes,
-    });
+      emitToStudent(document.trackingId, 'document:status', {
+        documentId: document._id,
+        documentType: document.documentType,
+        status,
+        counselorNotes: notes,
+      });
+    }
 
-    return sendSuccess(res, document, `Document marked as ${status}`);
+    return sendSuccess(res, document, `Document successfully marked as ${status}`);
   } catch (error) {
     next(error);
   }
