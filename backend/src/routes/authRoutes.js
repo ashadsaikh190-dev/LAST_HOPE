@@ -107,6 +107,17 @@ router.post('/register', authLimiter, validateRegistration, async (req, res, nex
       recipient: student.email,
     });
 
+    if (student.phone) {
+      await createNotification({
+        studentId: student._id,
+        trackingId,
+        type: 'SMS',
+        title: 'GIET Admissions',
+        content: `Welcome ${firstName}! Registration confirmed. Tracking ID: ${trackingId}. Portal: http://172.33.0.36:5173`,
+        recipient: student.phone,
+      });
+    }
+
     const token = generateToken(user._id);
 
     return sendSuccess(
@@ -125,6 +136,8 @@ router.post('/register', authLimiter, validateRegistration, async (req, res, nex
           trackingId: student.trackingId,
           firstName: student.firstName,
           lastName: student.lastName,
+          email: student.email,
+          phone: student.phone,
           currentStage: student.currentStage,
         },
       },

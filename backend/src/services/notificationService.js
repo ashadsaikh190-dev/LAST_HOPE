@@ -2,6 +2,7 @@ const Notification = require('../models/Notification');
 const { NOTIFICATION_STATUS } = require('../config/constants');
 const { emitToStudent } = require('../config/socket');
 const { sendSesEmail } = require('./sesService');
+const { sendSnsSms } = require('./snsService');
 
 const createNotification = async ({
   studentId,
@@ -47,6 +48,24 @@ const createNotification = async ({
       } else {
         notification.status = NOTIFICATION_STATUS.FAILED;
         notification.failureReason = sesResult.error;
+      }
+      await notification.save();
+    } else if (type === 'SMS' && recipient) {
+      notification.status = NOTIFICATION_STATUS.SENDING;
+      await notification.save();
+
+      const smsResult = await sendSnsSms({
+        phoneNumber: recipient,
+        message: `${title}: ${content}`,
+      });
+
+      if (smsResult.success) {
+        notification.status = NOTIFICATION_STATUS.SENT;
+        notification.sesMessageId = smsResult.messageId;
+        notification.sentAt = new Date();
+      } else {
+        notification.status = NOTIFICATION_STATUS.FAILED;
+        notification.failureReason = smsResult.error;
       }
       await notification.save();
     } else {
