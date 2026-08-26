@@ -5,7 +5,7 @@ const { withRetryProtection } = require('../utils/retryHelper');
 
 const snsClient = isAwsConfigured
   ? new SNSClient({
-      region: config.AWS_REGION || 'ap-south-1',
+      region: 'us-east-1',
       credentials: {
         accessKeyId: config.AWS_ACCESS_KEY_ID,
         secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
