@@ -26,9 +26,6 @@ export const FloatingAiAssistant = () => {
   const [conversationId, setConversationId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Only display for student role or visitors
-  if (user && !isStudent) return null;
-
   useEffect(() => {
     if (student?._id) {
       const fetchHistory = async () => {
@@ -119,6 +116,9 @@ export const FloatingAiAssistant = () => {
     'I want to apply for a fee waiver',
     'What is my official enrollment status?',
   ];
+
+  // Only display for student role or visitors
+  if (user && !isStudent) return null;
 
   return (
     <>
