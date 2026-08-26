@@ -29,11 +29,14 @@ const { createNotification } = require('../services/notificationService');
 const { emitToStudent, emitToCounselors } = require('../config/socket');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
+// Enforce authentication & role protection for all Counselor endpoints
+router.use(protect, authorize(ROLES.COUNSELOR, ROLES.ADMIN));
+
 /**
  * @route   GET /api/counselor/dashboard
  * @desc    Get real-time database calculated metrics & conversion funnel
  */
-router.get('/dashboard', protect, async (req, res, next) => {
+router.get('/dashboard', async (req, res, next) => {
   try {
     const [
       totalStudents,
