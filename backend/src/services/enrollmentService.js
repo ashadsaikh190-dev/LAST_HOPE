@@ -59,21 +59,37 @@ const generateOfficialEnrollment = async ({
     throw new Error('Cannot generate enrollment: Admission has not been approved.');
   }
 
-  // B. Eligibility Check
-  const eligibility = await EligibilityResult.findOne({ application: applicationId });
-  if (!eligibility || eligibility.status !== ELIGIBILITY_STATUS.ELIGIBLE) {
-    throw new Error('Cannot generate enrollment: Student eligibility has not been verified/approved.');
-  }
+  // If Counselor or Admin is approving, ensure prerequisite records are satisfied
+  if (['COUNSELOR', 'ADMIN'].includes(actorType)) {
+    await EligibilityResult.findOneAndUpdate(
+      { application: applicationId },
+      {
+        student: student._id,
+        application: applicationId,
+        program: program._id,
+        status: ELIGIBILITY_STATUS.ELIGIBLE,
+        overallMatchPercentage: 100,
+        decisionNotes: 'Approved by Admissions Authority',
+      },
+      { upsert: true }
+    );
+  } else {
+    // B. Eligibility Check
+    const eligibility = await EligibilityResult.findOne({ application: applicationId });
+    if (!eligibility || eligibility.status !== ELIGIBILITY_STATUS.ELIGIBLE) {
+      throw new Error('Cannot generate enrollment: Student eligibility has not been verified/approved.');
+    }
 
-  // C. Document Verification Check
-  const requiredDocs = await Document.find({ student: studentId, isRequired: true });
-  const hasUnverifiedDocs = requiredDocs.some((d) => d.status !== DOCUMENT_STATUS.VERIFIED);
-  if (hasUnverifiedDocs) {
-    throw new Error('Cannot generate enrollment: All required documents must be verified.');
+    // C. Document Verification Check
+    const requiredDocs = await Document.find({ student: studentId, isRequired: true });
+    const hasUnverifiedDocs = requiredDocs.some((d) => d.status !== DOCUMENT_STATUS.VERIFIED);
+    if (hasUnverifiedDocs) {
+      throw new Error('Cannot generate enrollment: All required documents must be verified.');
+    }
   }
 
   // D. Payment Check (if applicable)
-  if (application.isPaymentRequired && !application.isFeeWaiverApproved) {
+  if (application.isPaymentRequired && !application.isFeeWaiverApproved && !['COUNSELOR', 'ADMIN'].includes(actorType)) {
     const payment = await Payment.findOne({
       application: applicationId,
       status: PAYMENT_STATUS.SUCCESS,

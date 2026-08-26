@@ -93,13 +93,19 @@ router.get('/timeline', protect, authorize(ROLES.STUDENT), async (req, res, next
  * @route   GET /api/students/notifications
  * @desc    Get student notifications
  */
-router.get('/notifications', protect, authorize(ROLES.STUDENT), async (req, res, next) => {
+router.get('/notifications', protect, async (req, res, next) => {
   try {
-    const student = req.student;
-    const notifications = await Notification.find({ student: student._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-    return sendSuccess(res, notifications);
+    if (req.student) {
+      const notifications = await Notification.find({ student: req.student._id })
+        .sort({ createdAt: -1 })
+        .limit(50);
+      return sendSuccess(res, notifications);
+    } else {
+      const notifications = await Notification.find({ recipient: { $in: [req.user.email, 'system', req.user.role] } })
+        .sort({ createdAt: -1 })
+        .limit(50);
+      return sendSuccess(res, notifications);
+    }
   } catch (error) {
     next(error);
   }
