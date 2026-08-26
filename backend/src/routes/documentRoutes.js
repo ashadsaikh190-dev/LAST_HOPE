@@ -39,24 +39,30 @@ const upload = multer({
  */
 router.get('/', protect, async (req, res, next) => {
   try {
-    let studentId;
+    let query = {};
     if (req.user.role === ROLES.STUDENT) {
-      studentId = req.student._id;
+      query.student = req.student._id;
     } else {
-      // Counselor/Admin querying specific student
-      studentId = req.query.studentId;
-      if (!studentId && req.query.trackingId) {
+      // Counselor/Admin: filter by studentId or trackingId if passed, else fetch all active uploaded documents
+      if (req.query.studentId) {
+        query.student = req.query.studentId;
+      } else if (req.query.trackingId) {
         const s = await Student.findOne({ trackingId: req.query.trackingId });
-        studentId = s?._id;
+        if (s) query.student = s._id;
+      } else {
+        // Fetch all documents with uploaded versions for verification desk
+        query.currentVersion = { $ne: null };
       }
     }
 
-    if (!studentId) {
-      return sendError(res, 'Student ID or Tracking ID is required', 400, 'VALIDATION_ERROR');
-    }
-
-    const docs = await Document.find({ student: studentId })
+    const docs = await Document.find(query)
       .populate('currentVersion')
+      .populate('student', 'firstName lastName email trackingId')
+      .populate({
+        path: 'application',
+        select: 'applicationId personalDetails academicDetails',
+      })
+      .sort({ updatedAt: -1 })
       .lean();
 
     // Attach latest verification details to each document
