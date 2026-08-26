@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: admissions_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: autonomous_admissions
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: admissions_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/autonomous_admissions
+      - CLIENT_URL=http://localhost:5173
+      - AI_SERVICE_URL=http://ai-agent:8000
+      - JWT_SECRET=prod_secret_key_autonomous_admissions_platform_2026
+      - AI_SECRET_KEY=ai_internal_token_secret_key_2026
+    depends_on:
+      - mongodb
+
+  ai-agent:
+    build:
+      context: ./ai-agent
+      dockerfile: ../docker/Dockerfile.ai-agent
+    container_name: admissions_ai_agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - BACKEND_URL=http://backend:5000
+      - AI_SECRET_KEY=ai_internal_token_secret_key_2026
+    depends_on:
+      - backend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: admissions_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
