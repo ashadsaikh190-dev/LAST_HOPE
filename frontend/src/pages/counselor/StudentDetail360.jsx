@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { OCRDiffViewer } from '../../components/counselor/OCRDiffViewer';
+import { EmailStudentModal } from '../../components/counselor/EmailStudentModal';
 import {
   User,
   FileText,
@@ -43,6 +44,7 @@ export const StudentDetail360 = () => {
   const [approvalNotes, setApprovalNotes] = useState('Approved following counselor verification of credentials');
   const [scholarshipPct, setScholarshipPct] = useState(0);
   const [actionError, setActionError] = useState('');
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const fetchStudent360 = async () => {
     try {
@@ -209,6 +211,15 @@ export const StudentDetail360 = () => {
               <CreditCard className="w-3.5 h-3.5" />
               <span>Fee: {isFeePaid ? 'Paid' : 'Pending'}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setEmailModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Send email reminder to student"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Email Student</span>
+            </button>
           </div>
         </div>
 
@@ -779,6 +790,15 @@ export const StudentDetail360 = () => {
           </div>
         </div>
       )}
+
+      {/* Email Student Modal Overlay */}
+      <EmailStudentModal
+        isOpen={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        student={student}
+        application={application}
+        onEmailSent={fetchStudent360}
+      />
     </div>
   );
 };

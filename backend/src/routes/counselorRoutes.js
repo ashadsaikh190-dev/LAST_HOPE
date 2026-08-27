@@ -387,4 +387,34 @@ router.post('/documents/:id/verify-override', protect, async (req, res, next) =>
   }
 });
 
+/**
+ * @route   POST /api/counselor/students/:trackingId/log-email
+ * @desc    Log email sent event in AuditLog
+ */
+router.post('/students/:trackingId/log-email', protect, async (req, res, next) => {
+  try {
+    const { trackingId } = req.params;
+    const { recipientEmail, subject } = req.body;
+    const student = await Student.findOne({ trackingId });
+
+    if (student) {
+      await logAudit({
+        actorId: req.user._id,
+        actorType: req.user.role || 'COUNSELOR',
+        studentId: student._id,
+        trackingId,
+        action: 'EMAIL_SENT_TO_STUDENT',
+        metadata: {
+          recipientEmail,
+          subject,
+          description: `📧 Email sent to ${recipientEmail}`,
+        },
+      });
+    }
+    return sendSuccess(res, null, 'Email activity logged');
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
