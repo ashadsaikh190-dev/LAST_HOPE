@@ -56,7 +56,7 @@ class AdmissionsAgent:
         Intelligent Orchestrator:
         1. Routes queries using Sentence Transformer semantic classification.
         2. Routes university/database queries to Existing GPT Agent + Live DB Tools.
-        3. Routes general/open-ended questions to Gemini (gemini-3.6-flash).
+        3. Routes general/open-ended questions to Gemini (gemini-1.5-flash).
         4. Intelligently separates and synthesizes MIXED queries into one final response.
         5. Preserves 100% backward compatibility with existing frontends and tools.
         """
