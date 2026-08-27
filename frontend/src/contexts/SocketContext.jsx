@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -9,16 +9,18 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [lastSyncEvent, setLastSyncEvent] = useState(null);
 
   useEffect(() => {
     const newSocket = io(window.location.origin, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
     });
 
     newSocket.on('connect', () => {
       setIsConnected(true);
-      console.log('[Socket] Connected to server:', newSocket.id);
+      console.log('[Socket.IO] Connected to server:', newSocket.id);
 
       // Join appropriate rooms
       if (student?.trackingId) {
@@ -30,12 +32,18 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('disconnect', () => {
       setIsConnected(false);
-      console.log('[Socket] Disconnected from server');
+      console.log('[Socket.IO] Disconnected from server');
     });
 
     // Real-time Notification Listener
     newSocket.on('notification:new', (notif) => {
       setNotifications((prev) => [notif, ...prev]);
+    });
+
+    // Universal Synchronization Listener for all three roles
+    newSocket.on('sync:update', (eventPayload) => {
+      console.log('[Socket.IO] Universal Sync Update:', eventPayload);
+      setLastSyncEvent(eventPayload);
     });
 
     setSocket(newSocket);
@@ -52,6 +60,7 @@ export const SocketProvider = ({ children }) => {
         isConnected,
         notifications,
         setNotifications,
+        lastSyncEvent,
       }}
     >
       {children}

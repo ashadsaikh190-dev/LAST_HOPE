@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../api/axios';
 import { useNavigate } from 'react-router-dom';
+import { useSocket } from '../../contexts/SocketContext';
 import {
   LayoutDashboard,
   Users,
@@ -273,7 +274,21 @@ export const AdminDashboard = () => {
     if (activeTab === 'health') fetchCostProtection();
   }, [activeTab, fetchStudents, fetchCounselors, fetchAtRisk, fetchApprovals, fetchAuditLogs, fetchCostProtection]);
 
-  // Auto-refresh overview every 30s
+  const { lastSyncEvent } = useSocket() || {};
+
+  // Auto-refresh when any role triggers an event
+  useEffect(() => {
+    if (lastSyncEvent) {
+      fetchOverview();
+      if (activeTab === 'students') fetchStudents();
+      if (activeTab === 'counselors') fetchCounselors();
+      if (activeTab === 'at-risk') fetchAtRisk();
+      if (activeTab === 'approvals') fetchApprovals();
+      if (activeTab === 'audit') fetchAuditLogs();
+    }
+  }, [lastSyncEvent, activeTab, fetchOverview, fetchStudents, fetchCounselors, fetchAtRisk, fetchApprovals, fetchAuditLogs]);
+
+  // Auto-refresh overview every 30s as heartbeat
   useEffect(() => {
     const interval = setInterval(fetchOverview, 30000);
     return () => clearInterval(interval);

@@ -121,14 +121,27 @@ const confirmPaymentSuccess = async ({
     reason: 'Application fee received and verified',
   });
 
-  // Send receipt notification
-  await createNotification({
+  // Dispatch PAYMENT_COMPLETED event via EventBus
+  const { EVENTS, dispatchEvent } = require('./eventBusService');
+  await dispatchEvent(EVENTS.PAYMENT_COMPLETED, {
+    actorId,
+    actorType: 'SYSTEM',
     studentId: payment.student._id,
     trackingId: payment.trackingId,
-    type: 'EMAIL',
-    title: 'Payment Confirmation & Receipt - GIET Admissions',
-    content: `Thank you! Your payment of ₹${payment.amount.toLocaleString('en-IN')} has been received. Receipt Number: ${receiptNumber}. Your application is now under institutional admission review.`,
-    recipient: payment.student.email,
+    metadata: {
+      paymentId: payment.paymentId,
+      amount: payment.amount,
+      receiptNumber,
+      transactionReference: payment.transactionReference,
+    },
+    notificationData: {
+      type: 'EMAIL',
+      title: 'Payment Confirmation & Receipt - GIET Admissions',
+      content: `Thank you! Your payment of ₹${payment.amount.toLocaleString('en-IN')} has been received. Receipt Number: ${receiptNumber}. Application under review.`,
+      recipient: payment.student?.email,
+    },
+    ipAddress,
+    userAgent,
   });
 
   // Emit real-time event

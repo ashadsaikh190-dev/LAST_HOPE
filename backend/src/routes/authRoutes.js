@@ -10,6 +10,7 @@ const { ROLES, LIFECYCLE_STAGES } = require('../config/constants');
 const { generateUniqueTrackingId } = require('../services/trackingIdService');
 const { logAudit } = require('../services/auditService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { protect } = require('../middleware/auth');
 const { validateRegistration, validateLogin } = require('../middleware/validation');
 const { authLimiter } = require('../middleware/rateLimiter');
@@ -89,27 +90,21 @@ router.post('/register', authLimiter, validateRegistration, async (req, res, nex
       status: 'CONVERTED',
     });
 
-    // 6. Log Audit
-    await logAudit({
+    // 6. Dispatch Registration Event via EventBus (updates audit, timestamps, socket sync across all roles)
+    await dispatchEvent(EVENTS.STUDENT_REGISTERED, {
       actorId: user._id,
       actorType: 'STUDENT',
       studentId: student._id,
       trackingId,
-      action: 'STUDENT_REGISTERED',
-      result: 'SUCCESS',
-      metadata: { email: student.email, source },
+      metadata: { email: student.email, source, assignedCounselor: activeCounselor?.name || 'Unassigned' },
+      notificationData: {
+        type: 'EMAIL',
+        title: 'Welcome to GIET University Admissions',
+        content: `Welcome ${firstName}! Your registration is complete. Tracking ID: ${trackingId}.`,
+        recipient: student.email,
+      },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-    });
-
-    // 7. Dispatch Welcome Notification
-    await createNotification({
-      studentId: student._id,
-      trackingId,
-      type: 'EMAIL',
-      title: 'Welcome to GIET University Admissions',
-      content: `Welcome ${firstName}! Your registration is complete. Your permanent Student Tracking ID is ${trackingId}. Keep this ID safe to track your entire admissions journey.`,
-      recipient: student.email,
     });
 
     if (student.phone) {
@@ -181,13 +176,12 @@ router.post('/login', authLimiter, validateLogin, async (req, res, next) => {
 
     const token = generateToken(user._id);
 
-    await logAudit({
+    await dispatchEvent(EVENTS.STUDENT_LOGIN, {
       actorId: user._id,
       actorType: user.role,
       studentId: studentData?._id || null,
-      trackingId: user.trackingId || null,
-      action: 'USER_LOGIN',
-      result: 'SUCCESS',
+      trackingId: user.trackingId || studentData?.trackingId || null,
+      metadata: { role: user.role, email: user.email },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });

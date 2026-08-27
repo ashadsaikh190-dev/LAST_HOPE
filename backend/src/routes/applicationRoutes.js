@@ -11,6 +11,7 @@ const { generateApplicationId } = require('../utils/idGenerator');
 const { transitionStudentStage } = require('../services/stateMachineService');
 const { logAudit } = require('../services/auditService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 /**
@@ -94,24 +95,21 @@ router.post('/', protect, authorize(ROLES.STUDENT), async (req, res, next) => {
       );
     }
 
-    await logAudit({
+    // 6. Dispatch APPLICATION_COMPLETED event via EventBus (syncs real-time with Counselor & Admin Funnel)
+    await dispatchEvent(EVENTS.APPLICATION_COMPLETED, {
       actorId: req.user._id,
       actorType: 'STUDENT',
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'APPLICATION_SUBMITTED',
       metadata: { applicationId, programCode: program.code, programName: program.name },
+      notificationData: {
+        type: 'EMAIL',
+        title: 'Application Received - GIET Admissions',
+        content: `Your application (${applicationId}) for ${program.name} has been received. Required documents generated.`,
+        recipient: student.email,
+      },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-    });
-
-    await createNotification({
-      studentId: student._id,
-      trackingId: student.trackingId,
-      type: 'EMAIL',
-      title: 'Application Received - GIET Admissions',
-      content: `Your application (${applicationId}) for ${program.name} has been received. Please upload your required documents to proceed with autonomous verification.`,
-      recipient: student.email,
     });
 
     return sendSuccess(

@@ -16,11 +16,37 @@ const { generateOfficialEnrollment } = require('./enrollmentService');
 const { createNotification } = require('./notificationService');
 const { scheduleAutomatedFollowUp } = require('./followUpService');
 const { logAudit } = require('./auditService');
-const { COUNSELOR_CASE_PRIORITY, COUNSELOR_CASE_CATEGORY, DOCUMENT_STATUS } = require('../config/constants');
+const { COUNSELOR_CASE_PRIORITY, COUNSELOR_CASE_CATEGORY, DOCUMENT_STATUS, LIFECYCLE_STAGES } = require('../config/constants');
 const { emitToCounselors } = require('../config/socket');
 
 /**
- * AI Tool Execution Dispatcher with strict ownership and permission validation
+ * Resolves a student by trackingId, studentName, or email
+ */
+const resolveStudent = async (trackingId, parameters = {}) => {
+  if (trackingId) {
+    const s = await Student.findOne({ trackingId }).populate('selectedProgram persona assignedCounselor');
+    if (s) return s;
+  }
+  if (parameters.trackingId) {
+    const s = await Student.findOne({ trackingId: parameters.trackingId }).populate('selectedProgram persona assignedCounselor');
+    if (s) return s;
+  }
+  if (parameters.studentName) {
+    const regex = new RegExp(parameters.studentName.trim(), 'i');
+    const s = await Student.findOne({
+      $or: [{ firstName: regex }, { lastName: regex }],
+    }).populate('selectedProgram persona assignedCounselor');
+    if (s) return s;
+  }
+  if (parameters.email) {
+    const s = await Student.findOne({ email: parameters.email.toLowerCase().trim() }).populate('selectedProgram persona assignedCounselor');
+    if (s) return s;
+  }
+  return null;
+};
+
+/**
+ * AI Tool Execution Dispatcher with strict ownership and real-data DB lookups
  */
 const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId, context = {} }) => {
   const actionId = `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -30,8 +56,8 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
 
     switch (toolName) {
       case 'getStudentProfile': {
-        const student = await Student.findOne({ trackingId }).populate('selectedProgram persona');
-        if (!student) throw new Error(`Student ${trackingId} not found`);
+        const student = await resolveStudent(trackingId, parameters);
+        if (!student) throw new Error(`Student ${trackingId || parameters.studentName || ''} not found in records.`);
         result = {
           trackingId: student.trackingId,
           name: `${student.firstName} ${student.lastName}`,
@@ -41,13 +67,14 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
           selectedProgram: student.selectedProgram ? student.selectedProgram.name : null,
           academicProfile: student.academicProfile,
           officialEnrollmentNumber: student.officialEnrollmentNumber || null,
+          assignedCounselor: student.assignedCounselor ? student.assignedCounselor.name : 'Unassigned',
         };
         break;
       }
 
       case 'updateStudentProfile': {
-        const student = await Student.findOne({ trackingId });
-        if (!student) throw new Error(`Student ${trackingId} not found`);
+        const student = await resolveStudent(trackingId, parameters);
+        if (!student) throw new Error(`Student not found`);
         if (parameters.phone) student.phone = parameters.phone;
         if (parameters.academicProfile) {
           student.academicProfile = { ...student.academicProfile, ...parameters.academicProfile };
@@ -73,7 +100,10 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getApplication': {
-        const app = await Application.findOne({ trackingId }).populate('program');
+        const student = await resolveStudent(trackingId, parameters);
+        const app = student
+          ? await Application.findOne({ student: student._id }).populate('program')
+          : await Application.findOne({ trackingId }).populate('program');
         result = app || { message: 'No application started yet' };
         break;
       }
@@ -92,14 +122,17 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'checkEligibility': {
-        const app = await Application.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
+        const app = student
+          ? await Application.findOne({ student: student._id })
+          : await Application.findOne({ trackingId });
         if (!app) throw new Error('Cannot check eligibility without a submitted application');
         result = await evaluateEligibility(app._id);
         break;
       }
 
       case 'getRequiredDocuments': {
-        const student = await Student.findOne({ trackingId }).populate('selectedProgram');
+        const student = await resolveStudent(trackingId, parameters);
         const reqDocTypes = student?.selectedProgram?.requiredDocumentTypes || [
           'IDENTITY_PROOF',
           'MARKSHEET_10TH',
@@ -114,7 +147,7 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getMissingDocuments': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const docs = await Document.find({ student: student._id });
         const uploadedTypes = docs
@@ -128,7 +161,7 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getDocuments': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const docs = await Document.find({ student: student._id }).populate('currentVersion');
         result = docs;
@@ -136,7 +169,7 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getVerificationStatus': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const verifications = await DocumentVerification.find({ student: student._id }).populate('document');
         result = verifications.map((v) => ({
@@ -150,7 +183,7 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getPaymentStatus': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const payments = await Payment.find({ student: student._id });
         result = payments;
@@ -158,15 +191,55 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getAdmissionStatus': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const admission = await Admission.findOne({ student: student._id }).populate('program');
         result = admission || { status: 'PENDING_REVIEW', message: 'Application under review' };
         break;
       }
 
+      case 'getIncompleteTasks':
+      case 'getStudentChecklist': {
+        const student = await resolveStudent(trackingId, parameters);
+        if (!student) throw new Error('Student not found in database.');
+
+        const [app, docs, payment, admission] = await Promise.all([
+          Application.findOne({ student: student._id }),
+          Document.find({ student: student._id }),
+          Payment.findOne({ student: student._id, status: 'SUCCESS' }),
+          Admission.findOne({ student: student._id }),
+        ]);
+
+        const reqDocTypes = ['IDENTITY_PROOF', 'MARKSHEET_10TH', 'MARKSHEET_12TH', 'PASSPORT_PHOTO'];
+        const uploadedTypes = docs
+          .filter((d) => d.status !== DOCUMENT_STATUS.NOT_UPLOADED && d.status !== DOCUMENT_STATUS.REJECTED)
+          .map((d) => d.documentType);
+        const missingDocs = reqDocTypes.filter((t) => !uploadedTypes.includes(t));
+
+        const unverifiedDocs = docs
+          .filter((d) => d.status === DOCUMENT_STATUS.PROCESSING || d.status === DOCUMENT_STATUS.NEEDS_REVIEW)
+          .map((d) => d.documentType);
+
+        const incompleteTasks = [];
+        if (!app) incompleteTasks.push('Application Form not submitted');
+        if (missingDocs.length > 0) incompleteTasks.push(`Missing Documents: ${missingDocs.join(', ')}`);
+        if (unverifiedDocs.length > 0) incompleteTasks.push(`Documents Awaiting Verification: ${unverifiedDocs.join(', ')}`);
+        if (!payment) incompleteTasks.push('Tuition / Application fee payment pending');
+        if (!admission || admission.status !== 'APPROVED') incompleteTasks.push('Admission approval pending review');
+        if (!student.officialEnrollmentNumber) incompleteTasks.push('Official enrollment card not issued');
+
+        result = {
+          studentName: `${student.firstName} ${student.lastName}`,
+          trackingId: student.trackingId,
+          currentStage: student.currentStage,
+          incompleteTasks,
+          isAllComplete: incompleteTasks.length === 0,
+        };
+        break;
+      }
+
       case 'createCounselorEscalation': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         const caseId = generateCaseId();
         const priority = parameters.priority || COUNSELOR_CASE_PRIORITY.MEDIUM;
@@ -175,18 +248,19 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
         const counselorCase = await CounselorCase.create({
           caseId,
           student: student._id,
-          trackingId,
+          trackingId: student.trackingId,
           priority,
           category,
           summary: parameters.summary || 'Student requested counselor escalation via AI Assistant',
           aiReason: parameters.reason || 'Complex query / policy exception / human intervention requested',
           conversationSummary: parameters.conversationSummary || '',
           recommendedAction: parameters.recommendedAction || 'Review student case details and contact student.',
+          assignedCounselor: student.assignedCounselor?._id || null,
         });
 
         emitToCounselors('case:escalated', {
           caseId,
-          trackingId,
+          trackingId: student.trackingId,
           category,
           summary: counselorCase.summary,
         });
@@ -200,7 +274,7 @@ const executeAiTool = async ({ toolName, parameters = {}, studentId, trackingId,
       }
 
       case 'getEnrollmentNumber': {
-        const student = await Student.findOne({ trackingId });
+        const student = await resolveStudent(trackingId, parameters);
         if (!student) throw new Error('Student not found');
         if (!student.officialEnrollmentNumber) {
           result = { isEnrolled: false, message: 'Enrollment has not been generated yet.' };

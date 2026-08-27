@@ -26,6 +26,7 @@ const {
 const { logAudit } = require('../services/auditService');
 const { transitionStudentStage } = require('../services/stateMachineService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { emitToStudent, emitToCounselors } = require('../config/socket');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
@@ -299,26 +300,22 @@ router.post('/cases/:id/resolve', protect, authorize(ROLES.COUNSELOR, ROLES.ADMI
       });
     }
 
-    await logAudit({
+    await dispatchEvent(EVENTS.COUNSELLOR_FOLLOWUP_COMPLETED, {
       actorId: req.user._id,
       actorType: req.user.role,
       studentId: counselorCase.student?._id,
       trackingId: counselorCase.trackingId,
-      action: 'COUNSELOR_CASE_RESOLVED',
       metadata: {
         caseId: counselorCase.caseId,
         decision: resolutionDecision,
         notes: resolutionNotes,
       },
-    });
-
-    await createNotification({
-      studentId: counselorCase.student._id,
-      trackingId: counselorCase.trackingId,
-      type: 'IN_APP',
-      title: 'Counselor Review Decision',
-      content: `Your inquiry/case (${counselorCase.caseId}) has been resolved by our admissions team: ${resolutionNotes}`,
-      recipient: counselorCase.student.email,
+      notificationData: {
+        type: 'IN_APP',
+        title: 'Counselor Review Decision',
+        content: `Your inquiry/case (${counselorCase.caseId}) has been resolved by our admissions team: ${resolutionNotes}`,
+        recipient: counselorCase.student?.email,
+      },
     });
 
     return sendSuccess(res, counselorCase, 'Case resolved successfully');
@@ -364,13 +361,19 @@ router.post('/documents/:id/verify-override', protect, async (req, res, next) =>
     }
 
     if (document.student) {
-      await logAudit({
+      const eventType = status === 'VERIFIED' ? EVENTS.DOCUMENT_VERIFIED : EVENTS.DOCUMENT_REJECTED;
+      await dispatchEvent(eventType, {
         actorId: req.user._id,
         actorType: req.user.role || 'COUNSELOR',
         studentId: document.student._id || document.student,
         trackingId: document.trackingId,
-        action: 'DOCUMENT_MANUAL_VERIFY_OVERRIDE',
         metadata: { documentType: document.documentType, status, notes },
+        notificationData: {
+          type: 'IN_APP',
+          title: `Document ${status === 'VERIFIED' ? 'Verified' : 'Verification Update'}`,
+          content: `Your ${document.documentType} was marked as ${status}. ${notes ? `Notes: ${notes}` : ''}`,
+          recipient: document.student.email,
+        },
       });
 
       emitToStudent(document.trackingId, 'document:status', {
@@ -398,12 +401,11 @@ router.post('/students/:trackingId/log-email', protect, async (req, res, next) =
     const student = await Student.findOne({ trackingId });
 
     if (student) {
-      await logAudit({
+      await dispatchEvent(EVENTS.EMAIL_SENT, {
         actorId: req.user._id,
         actorType: req.user.role || 'COUNSELOR',
         studentId: student._id,
         trackingId,
-        action: 'EMAIL_SENT_TO_STUDENT',
         metadata: {
           recipientEmail,
           subject,

@@ -16,6 +16,7 @@ const { queueDocumentProcessing } = require('../services/sqsService');
 const { transitionStudentStage } = require('../services/stateMachineService');
 const { logAudit } = require('../services/auditService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 const upload = multer({
@@ -224,13 +225,12 @@ router.post('/upload', protect, authorize(ROLES.STUDENT), upload.single('file'),
       });
     }
 
-    // Log Audit
-    await logAudit({
+    // Dispatch DOCUMENT_UPLOADED Event via EventBus (updates audit, student timestamps, at-risk checks, real-time socket sync)
+    await dispatchEvent(EVENTS.DOCUMENT_UPLOADED, {
       actorId: req.user._id,
       actorType: 'STUDENT',
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'DOCUMENT_UPLOADED',
       metadata: {
         documentType,
         versionNumber,
@@ -323,28 +323,24 @@ router.post('/:id/replace', protect, authorize(ROLES.STUDENT), upload.single('fi
       fileName: file.originalname,
     });
 
-    await logAudit({
+    await dispatchEvent(EVENTS.DOCUMENT_UPDATED, {
       actorId: req.user._id,
       actorType: 'STUDENT',
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'DOCUMENT_REPLACED',
       metadata: {
         documentType: document.documentType,
         newVersionNumber: versionNumber,
         replacementReason,
       },
+      notificationData: {
+        type: 'IN_APP',
+        title: 'Document Replacement Under Verification',
+        content: `Replacement for ${document.documentType} (v${versionNumber}) received. Verification restarted.`,
+        recipient: student.email,
+      },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-    });
-
-    await createNotification({
-      studentId: student._id,
-      trackingId: student.trackingId,
-      type: 'IN_APP',
-      title: 'Document Replacement Under Verification',
-      content: `Replacement for ${document.documentType} (v${versionNumber}) received. Verification restarted.`,
-      recipient: student.email,
     });
 
     return sendSuccess(

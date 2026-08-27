@@ -10,6 +10,7 @@ const { transitionStudentStage } = require('../services/stateMachineService');
 const { generateOfficialEnrollment } = require('../services/enrollmentService');
 const { logAudit } = require('../services/auditService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { emitToStudent, emitToCounselors } = require('../config/socket');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
@@ -71,13 +72,18 @@ router.post('/:applicationId/approve', protect, authorize(ROLES.COUNSELOR, ROLES
       reason: 'Admission offer approved by institutional authority',
     });
 
-    await logAudit({
+    await dispatchEvent(EVENTS.OFFER_GENERATED, {
       actorId: req.user._id,
       actorType: req.user.role,
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'ADMISSION_OFFER_APPROVED',
       metadata: { applicationId: application.applicationId, scholarshipPercentage },
+      notificationData: {
+        type: 'EMAIL',
+        title: 'Admission Approved - GIET University',
+        content: `Congratulations! Your admission has been approved with ${scholarshipPercentage}% scholarship.`,
+        recipient: student.email,
+      },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
@@ -90,6 +96,14 @@ router.post('/:applicationId/approve', protect, authorize(ROLES.COUNSELOR, ROLES
       actorType: req.user.role,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
+    });
+
+    await dispatchEvent(EVENTS.ADMISSION_COMPLETED, {
+      actorId: req.user._id,
+      actorType: req.user.role,
+      studentId: student._id,
+      trackingId: student.trackingId,
+      metadata: { officialEnrollmentNumber: enrollmentResult.enrollment?.enrollmentNumber },
     });
 
     emitToStudent(student.trackingId, 'admission:approved', {

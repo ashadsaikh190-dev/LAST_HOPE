@@ -18,6 +18,7 @@ const { authorize } = require('../middleware/role');
 const { ROLES, LIFECYCLE_STAGES, ADMISSION_STATUS, DOCUMENT_STATUS } = require('../config/constants');
 const { logAudit } = require('../services/auditService');
 const { createNotification } = require('../services/notificationService');
+const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 // Enforce authentication & role protection for all Admin endpoints
@@ -487,26 +488,22 @@ router.post('/students/:trackingId/reassign', async (req, res, next) => {
     student.assignedCounselor = newCounselor._id;
     await student.save();
 
-    await logAudit({
+    await dispatchEvent(EVENTS.COUNSELLOR_REASSIGNED, {
       actorId: req.user._id,
       actorType: 'ADMIN',
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'STUDENT_REASSIGNED',
       metadata: {
         previousCounselor: previousCounselorName,
         newCounselor: newCounselor.name,
         reason: reason || 'Reassigned by admissions administrator',
       },
-    });
-
-    await createNotification({
-      studentId: student._id,
-      trackingId: student.trackingId,
-      type: 'IN_APP',
-      title: 'Counselor Reassigned',
-      content: `Your admissions advisor has been updated to ${newCounselor.name}.`,
-      recipient: student.email,
+      notificationData: {
+        type: 'IN_APP',
+        title: 'Counselor Reassigned',
+        content: `Your admissions advisor has been updated to ${newCounselor.name}.`,
+        recipient: student.email,
+      },
     });
 
     return sendSuccess(
@@ -616,13 +613,18 @@ router.post('/students/:trackingId/remind-counselor', async (req, res, next) => 
       assignedCounselor: student.assignedCounselor._id,
     });
 
-    await logAudit({
+    await dispatchEvent(EVENTS.COUNSELLOR_FOLLOWUP_CREATED, {
       actorId: req.user._id,
       actorType: 'ADMIN',
       studentId: student._id,
       trackingId: student.trackingId,
-      action: 'COUNSELOR_REMINDER_SENT',
       metadata: { counselorName: student.assignedCounselor.name, notes },
+      notificationData: {
+        type: 'IN_APP',
+        title: 'Priority Admin Follow-up Reminder',
+        content: `Student ${student.firstName} ${student.lastName} (${student.trackingId}) flagged as at-risk. Please follow up immediately.`,
+        recipient: student.assignedCounselor.email,
+      },
     });
 
     return sendSuccess(
@@ -771,11 +773,27 @@ router.post('/approvals/:type/:id/decision', async (req, res, next) => {
       return sendError(res, 'Invalid approval type', 400, 'INVALID_TYPE');
     }
 
-    await logAudit({
+    let eventName = EVENTS.SCHOLARSHIP_APPROVED;
+    if (type === 'scholarship') {
+      eventName = decision === 'APPROVE' ? EVENTS.SCHOLARSHIP_APPROVED : EVENTS.SCHOLARSHIP_REJECTED;
+    } else if (type === 'admission-form') {
+      eventName = decision === 'APPROVE' ? EVENTS.ADMISSION_FORM_APPROVED : EVENTS.ADMISSION_FORM_REJECTED;
+    } else if (type === 'document') {
+      eventName = decision === 'APPROVE' ? EVENTS.DOCUMENT_VERIFIED : EVENTS.DOCUMENT_REJECTED;
+    }
+
+    await dispatchEvent(eventName, {
       actorId: req.user._id,
       actorType: 'ADMIN',
-      action: `ADMIN_APPROVAL_${type.toUpperCase()}_${decision}`,
+      studentId: result?.student?._id || result?.student,
+      trackingId: result?.trackingId || result?.student?.trackingId,
       metadata: { targetId: id, decision, reason, type },
+      notificationData: {
+        type: 'IN_APP',
+        title: `Admin Decision: ${type.toUpperCase()}`,
+        content: `Your ${type} review has been processed: [${decision}]. ${reason ? `Reason: ${reason}` : ''}`,
+        recipient: result?.student?.email,
+      },
     });
 
     return sendSuccess(res, result, `Approval decision [${decision}] recorded successfully.`);
