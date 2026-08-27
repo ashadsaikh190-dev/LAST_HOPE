@@ -22,7 +22,7 @@ export const Login = () => {
     setError('');
 
     try {
-      const data = await login(email, password);
+      const data = await login(email.trim(), password.trim());
       if (data?.user?.role === 'COUNSELOR') {
         navigate('/counselor');
       } else if (data?.user?.role === 'ADMIN') {
@@ -105,11 +105,34 @@ export const Login = () => {
           </button>
         </form>
 
-        {/* Quick Demo Credentials Box */}
-        <div className="mt-6 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] space-y-1 text-slate-600">
-          <p className="font-bold text-slate-800">Demo Staff Credentials:</p>
-          <p>Counselor: <code className="text-brand-700">counselor@university.edu</code> / <code className="text-slate-800">CounselorPassword123!</code></p>
-          <p>Admin: <code className="text-brand-700">admin@university.edu</code> / <code className="text-slate-800">AdminPassword123!</code></p>
+        {/* Quick Demo Credentials Box with One-Click Autofill */}
+        <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5 text-slate-600">
+          <p className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Quick Demo Login Shortcuts:</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('counselor@university.edu');
+                setPassword('CounselorPassword123!');
+              }}
+              className="px-3 py-2 rounded-xl bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 text-left font-medium text-[11px] text-slate-800 transition-all shadow-xs flex flex-col cursor-pointer"
+            >
+              <span className="font-bold text-brand-700">🧭 Counselor</span>
+              <span className="text-[10px] text-slate-400">Click to fill</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('admin@university.edu');
+                setPassword('AdminPassword123!');
+              }}
+              className="px-3 py-2 rounded-xl bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 text-left font-medium text-[11px] text-slate-800 transition-all shadow-xs flex flex-col cursor-pointer"
+            >
+              <span className="font-bold text-indigo-700">🛡️ Administrator</span>
+              <span className="text-[10px] text-slate-400">Click to fill</span>
+            </button>
+          </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
