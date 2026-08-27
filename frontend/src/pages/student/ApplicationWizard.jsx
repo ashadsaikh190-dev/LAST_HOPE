@@ -22,7 +22,6 @@ export const ApplicationWizard = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState(1);
 
   const [formData, setFormData] = useState({
     programId: '',
@@ -174,15 +173,17 @@ export const ApplicationWizard = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-12">
       <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between pb-6 border-b border-slate-100">
           <div>
             <h2 className="text-xl font-extrabold text-slate-900">Undergraduate Admissions Application Form</h2>
-            <p className="text-xs text-slate-500 mt-1">Autonomous evaluation & automatic document checklist configuration</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Autonomous evaluation & automatic document checklist configuration
+            </p>
           </div>
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
-            Step {step} of 2
+          <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
+            Admissions 2026-2027
           </span>
         </div>
 
@@ -193,304 +194,403 @@ export const ApplicationWizard = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-          {step === 1 && (
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-brand-600" />
-                1. Select Academic Program & Personal Details
-              </h3>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-8">
+          {/* Section 1: Academic Program & Personal Details */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-brand-600" />
+              1. Select Academic Program & Personal Details
+            </h3>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Degree Program <span className="text-rose-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.programId}
+                onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
+                className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800"
+              >
+                <option value="">Select an accredited degree program</option>
+                {programs.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name} ({p.code}) — Fee: ₹{p.tuitionFee?.toLocaleString('en-IN')}/yr | Min 12th: {p.eligibilityCriteria?.minTwelfthMarks}%
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Full Candidate Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.personalDetails.fullName}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, fullName: e.target.value },
+                    })
+                  }
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Degree Program <span className="text-rose-500">*</span>
+                  Date of Birth <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <input
+                  type="date"
                   required
-                  value={formData.programId}
-                  onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
+                  value={formData.personalDetails.dateOfBirth}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, dateOfBirth: e.target.value },
+                    })
+                  }
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Gender</label>
+                <select
+                  value={formData.personalDetails.gender}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, gender: e.target.value },
+                    })
+                  }
                   className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
-                  <option value="">Select an accredited degree</option>
-                  {programs.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name} ({p.code}) — Fee: ₹{p.tuitionFee?.toLocaleString('en-IN')}/yr | Min 12th: {p.eligibilityCriteria?.minTwelfthMarks}%
-                    </option>
-                  ))}
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Primary Contact Phone <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.personalDetails.phone}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, phone: e.target.value },
+                    })
+                  }
+                  placeholder="+91 98765 43210"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={formData.personalDetails.email}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, email: e.target.value },
+                    })
+                  }
+                  placeholder="student@example.com"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Father's Name</label>
+                <input
+                  type="text"
+                  value={formData.personalDetails.fatherName}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, fatherName: e.target.value },
+                    })
+                  }
+                  placeholder="Father's Full Name"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Mother's Name</label>
+                <input
+                  type="text"
+                  value={formData.personalDetails.motherName}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: { ...formData.personalDetails, motherName: e.target.value },
+                    })
+                  }
+                  placeholder="Mother's Full Name"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Street Address</label>
+                <input
+                  type="text"
+                  value={formData.personalDetails.address.street}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: {
+                        ...formData.personalDetails,
+                        address: { ...formData.personalDetails.address, street: e.target.value },
+                      },
+                    })
+                  }
+                  placeholder="Flat / House / Street"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">City</label>
+                <input
+                  type="text"
+                  value={formData.personalDetails.address.city}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: {
+                        ...formData.personalDetails,
+                        address: { ...formData.personalDetails.address, city: e.target.value },
+                      },
+                    })
+                  }
+                  placeholder="City"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Pincode</label>
+                <input
+                  type="text"
+                  value={formData.personalDetails.address.pincode}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      personalDetails: {
+                        ...formData.personalDetails,
+                        address: { ...formData.personalDetails.address, pincode: e.target.value },
+                      },
+                    })
+                  }
+                  placeholder="Pincode"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Academic Scores & Qualifications */}
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-brand-600" />
+              2. Academic Qualifications & Educational Board
+            </h3>
+
+            {/* 10th Standard Details */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h4 className="text-xs font-bold text-slate-800">10th Standard / Matriculation</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Full Candidate Name</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Board <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
-                    value={formData.personalDetails.fullName}
+                    value={formData.academicDetails.tenthBoard}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        personalDetails: { ...formData.personalDetails, fullName: e.target.value },
+                        academicDetails: { ...formData.academicDetails, tenthBoard: e.target.value },
                       })
                     }
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="e.g. CBSE, ICSE, State Board"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Date of Birth</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Aggregate % <span className="text-rose-500">*</span>
+                  </label>
                   <input
-                    type="date"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
                     required
-                    value={formData.personalDetails.dateOfBirth}
+                    value={formData.academicDetails.tenthPercentage}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        personalDetails: { ...formData.personalDetails, dateOfBirth: e.target.value },
+                        academicDetails: { ...formData.academicDetails, tenthPercentage: parseFloat(e.target.value) || '' },
                       })
                     }
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="e.g. 85.5"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Passing Year <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.academicDetails.tenthPassingYear}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        academicDetails: { ...formData.academicDetails, tenthPassingYear: parseInt(e.target.value) || '' },
+                      })
+                    }
+                    placeholder="e.g. 2023"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* 12th Standard Details */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h4 className="text-xs font-bold text-slate-800">12th Standard / Higher Secondary</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Gender</label>
-                  <select
-                    value={formData.personalDetails.gender}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        personalDetails: { ...formData.personalDetails, gender: e.target.value },
-                      })
-                    }
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Primary Contact Phone</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Board <span className="text-rose-500">*</span>
+                  </label>
                   <input
-                    type="tel"
+                    type="text"
                     required
-                    value={formData.personalDetails.phone}
+                    value={formData.academicDetails.twelfthBoard}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        personalDetails: { ...formData.personalDetails, phone: e.target.value },
+                        academicDetails: { ...formData.academicDetails, twelfthBoard: e.target.value },
                       })
                     }
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="e.g. CBSE, ISC"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Aggregate % <span className="text-rose-500">*</span>
+                  </label>
                   <input
-                    type="email"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
                     required
-                    value={formData.personalDetails.email}
+                    value={formData.academicDetails.twelfthPercentage}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        personalDetails: { ...formData.personalDetails, email: e.target.value },
+                        academicDetails: { ...formData.academicDetails, twelfthPercentage: parseFloat(e.target.value) || '' },
                       })
                     }
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="e.g. 88.5"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Stream <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.academicDetails.twelfthStream}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        academicDetails: { ...formData.academicDetails, twelfthStream: e.target.value },
+                      })
+                    }
+                    placeholder="Science (PCM), Commerce, Arts"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Passing Year <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.academicDetails.twelfthPassingYear}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        academicDetails: { ...formData.academicDetails, twelfthPassingYear: parseInt(e.target.value) || '' },
+                      })
+                    }
+                    placeholder="e.g. 2025"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!formData.programId || !formData.personalDetails.fullName || !formData.personalDetails.dateOfBirth) {
-                      setError('Please fill in program, name, and date of birth before proceeding.');
-                      return;
-                    }
-                    setError('');
-                    setStep(2);
-                  }}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md transition-all"
-                >
-                  <span>Continue to Academic Scores</span>
+          {/* Form Submit Action */}
+          <div className="pt-6 border-t border-slate-100 flex justify-end">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 disabled:opacity-50 transition-all cursor-pointer"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Submitting Application...</span>
+                </>
+              ) : (
+                <>
+                  <span>Submit Application & Generate Document Checklist</span>
                   <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-brand-600" />
-                2. Academic Marks & Educational Board
-              </h3>
-
-              {/* 10th Standard Details */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="text-xs font-bold text-slate-800">10th Standard / Matriculation</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Board</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.academicDetails.tenthBoard}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, tenthBoard: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Aggregate %</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.academicDetails.tenthPercentage}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, tenthPercentage: parseFloat(e.target.value) },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Passing Year</label>
-                    <input
-                      type="number"
-                      required
-                      value={formData.academicDetails.tenthPassingYear}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, tenthPassingYear: parseInt(e.target.value) },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 12th Standard Details */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="text-xs font-bold text-slate-800">12th Standard / Higher Secondary</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Board</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.academicDetails.twelfthBoard}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, twelfthBoard: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Aggregate %</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.academicDetails.twelfthPercentage}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, twelfthPercentage: parseFloat(e.target.value) },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stream</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.academicDetails.twelfthStream}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, twelfthStream: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Passing Year</label>
-                    <input
-                      type="number"
-                      required
-                      value={formData.academicDetails.twelfthPassingYear}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          academicDetails: { ...formData.academicDetails, twelfthPassingYear: parseInt(e.target.value) },
-                        })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Submitting Application...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Submit Application & Generate Document Checklist</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+                </>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
