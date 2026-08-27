@@ -86,18 +86,42 @@ class AdmissionsAgent:
             f"(Confidence: {confidence:.2f}, DB Required: {routing_decision.requires_database})"
         )
 
-        # Step 2b: Fast-path for known-answer intents (refund, rankings, placements, campus)
-        #   These do NOT need any LLM call — return grounded answers immediately.
+        # Step 2b: Fast-path for known-answer intents — no LLM needed, answer from DB tools directly.
+        #   This covers: fees, programs, eligibility, refunds, rankings, placements, campus, documents.
+        #   Extended to work even when OpenAI/Gemini quotas are exhausted.
         FAST_PATH_INTENTS = [
             "REFUND_INQUIRY", "FEE_WAIVER_REQUEST", "COUNSELOR_REQUEST", "COMPLAINT",
+            "FEE_INQUIRY", "PROGRAM_DISCOVERY", "ELIGIBILITY_QUERY",
+            "DOCUMENT_STATUS", "DOCUMENT_REPLACEMENT", "APPLICATION_STATUS",
         ]
         FAST_PATH_KEYWORDS = {
+            # Refund / cancellation
             "refund": True, "money back": True, "cancel admission": True,
             "withdraw admission": True, "cancellation policy": True,
             "cancel my seat": True, "fee refund": True, "return money": True,
-            "rank": True, "ranking": True, "nirf": True, "naac": True,
-            "placement": True, "package": True, "salary": True,
-            "hostel": True, "campus": True, "facility": True, "dorm": True,
+            # Rankings / accreditation
+            "rank": True, "ranking": True, "nirf": True, "naac": True, "nba": True,
+            # Placements
+            "placement": True, "package": True, "salary": True, "lpa": True,
+            "recruiter": True, "hiring": True, "job": True, "career": True,
+            # Campus & facilities
+            "hostel": True, "campus": True, "facility": True, "facilities": True,
+            "dorm": True, "library": True, "sports": True, "mess": True, "canteen": True,
+            # Fees & programs (KEY FIX — these now bypass LLM entirely)
+            "fee": True, "fees": True, "tuition": True, "cost": True,
+            "how much": True, "price": True, "charges": True,
+            "program": True, "programmes": True, "course": True, "courses": True,
+            "degree": True, "btech": True, "b.tech": True, "mba": True,
+            "cse": True, "ai": True, "ece": True, "mech": True, "mechanical": True,
+            "computer science": True, "data science": True, "electronics": True,
+            # Eligibility
+            "eligib": True, "cutoff": True, "criteria": True, "qualify": True,
+            "12th": True, "10th": True, "marks": True, "percentage": True,
+            # Documents
+            "document": True, "marksheet": True, "aadhaar": True, "certificate": True,
+            "upload": True, "verification": True,
+            # Application
+            "application": True, "apply": True, "admission": True, "status": True,
         }
         msg_lower_check = message_text.lower().strip()
         needs_fast_path = (
