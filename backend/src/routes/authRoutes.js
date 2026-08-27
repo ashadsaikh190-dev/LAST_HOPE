@@ -48,7 +48,10 @@ router.post('/register', authLimiter, validateRegistration, async (req, res, nex
       trackingId,
     });
 
-    // 3. Create Student Profile
+    // 3. Find active counselor for assignment if available
+    const activeCounselor = await User.findOne({ role: ROLES.COUNSELOR, isActive: true }).sort({ updatedAt: 1 });
+
+    // 4. Create Student Profile
     const student = await Student.create({
       trackingId,
       user: user._id,
@@ -58,6 +61,8 @@ router.post('/register', authLimiter, validateRegistration, async (req, res, nex
       phone: phone || '',
       currentStage: LIFECYCLE_STAGES.REGISTERED,
       selectedProgram: interestedProgramId || null,
+      assignedCounselor: activeCounselor?._id || null,
+      lastActivityAt: new Date(),
     });
 
     // 4. Create Initial Persona

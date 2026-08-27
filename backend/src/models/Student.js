@@ -96,6 +96,18 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    assignedCounselor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+    lastActivityAt: {
+      type: Date,
+      default: Date.now,
+    },
+    lastCounselorInteractionAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

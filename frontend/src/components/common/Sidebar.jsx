@@ -45,10 +45,8 @@ export const Sidebar = () => {
   ];
 
   const adminLinks = [
-    { to: '/admin', label: 'Institutional Metrics', icon: LayoutDashboard },
+    { to: '/admin', label: 'Command Center', icon: LayoutDashboard },
     { to: '/admin/programs', label: 'Program Catalog', icon: BookOpen },
-    { to: '/admin/users', label: 'Staff & Roles', icon: Users },
-    { to: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { to: '/admin/health', label: 'AWS & System Health', icon: Activity },
   ];
 
