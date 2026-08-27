@@ -32,9 +32,15 @@ export const EscalationsInbox = () => {
 
   useEffect(() => {
     if (!socket) return;
-    const handleEscalated = () => fetchCases();
-    socket.on('case:escalated', handleEscalated);
-    return () => socket.off('case:escalated', handleEscalated);
+    const handleUpdate = () => fetchCases();
+    socket.on('case:escalated', handleUpdate);
+    socket.on('case:resolved', handleUpdate);
+    socket.on('sync:update', handleUpdate);
+    return () => {
+      socket.off('case:escalated', handleUpdate);
+      socket.off('case:resolved', handleUpdate);
+      socket.off('sync:update', handleUpdate);
+    };
   }, [socket]);
 
   return (

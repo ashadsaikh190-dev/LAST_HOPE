@@ -365,22 +365,44 @@ router.post('/cases/:id/resolve', protect, authorize(ROLES.COUNSELOR, ROLES.ADMI
     counselorCase.assignedCounselor = req.user._id;
     await counselorCase.save();
 
-    // If fee waiver approved, update Application
-    if (resolutionDecision === 'APPROVED_FEE_WAIVER' && counselorCase.application) {
-      await Application.findByIdAndUpdate(counselorCase.application._id, {
-        isFeeWaiverApproved: true,
-        isPaymentRequired: false,
+    // If fee waiver approved, update Application & Student
+    if (resolutionDecision === 'APPROVED_FEE_WAIVER' && counselorCase.student) {
+      const app = counselorCase.application || await Application.findOne({ student: counselorCase.student._id });
+      if (app) {
+        app.isFeeWaiverApproved = true;
+        app.isPaymentRequired = false;
+        await app.save();
+      }
+
+      await Student.findByIdAndUpdate(counselorCase.student._id, {
+        isSpecialFeeWaiverRequested: false,
       });
 
-      // Advance stage to ADMISSION_REVIEW
-      await transitionStudentStage({
-        studentId: counselorCase.student._id,
-        targetStage: LIFECYCLE_STAGES.ADMISSION_REVIEW,
-        actorId: req.user._id,
-        actorType: 'COUNSELOR',
-        reason: 'Fee waiver granted by admissions counselor',
-      });
+      // Advance stage to ADMISSION_REVIEW if currently in DOCUMENTS_PENDING / DOCUMENT_VERIFICATION
+      try {
+        await transitionStudentStage({
+          studentId: counselorCase.student._id,
+          targetStage: LIFECYCLE_STAGES.ADMISSION_REVIEW,
+          actorId: req.user._id,
+          actorType: 'COUNSELOR',
+          reason: `Fee waiver granted by admissions counselor. Notes: ${resolutionNotes}`,
+        });
+      } catch (stageErr) {
+        console.warn(`Stage transition note: ${stageErr.message}`);
+      }
+    } else if (resolutionDecision === 'APPROVED_EXCEPTION' && counselorCase.category === COUNSELOR_CASE_CATEGORY.DOCUMENT_AMBIGUITY) {
+      // Approve any pending / needs review documents
+      await Document.updateMany(
+        { student: counselorCase.student?._id, status: { $in: [DOCUMENT_STATUS.PROCESSING, DOCUMENT_STATUS.NEEDS_REVIEW, DOCUMENT_STATUS.MISMATCH] } },
+        { $set: { status: DOCUMENT_STATUS.VERIFIED, verificationNotes: `Approved by counselor exception: ${resolutionNotes}` } }
+      );
     }
+
+    emitToCounselors('case:resolved', {
+      caseId: counselorCase.caseId,
+      trackingId: counselorCase.trackingId,
+      decision: resolutionDecision,
+    });
 
     await dispatchEvent(EVENTS.COUNSELLOR_FOLLOWUP_COMPLETED, {
       actorId: req.user._id,
