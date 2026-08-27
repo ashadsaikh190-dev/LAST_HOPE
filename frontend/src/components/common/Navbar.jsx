@@ -53,79 +53,33 @@ export const Navbar = () => {
           </Link>
         </div>
 
-        {/* Middle: Student Tracking ID or Role Context & Fast Switcher */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* Quick Role Switcher Pills */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
-            <button
-              onClick={async () => {
-                if (user?.role !== 'STUDENT') {
-                  // Switch to student
-                  try {
-                    await login('student@university.edu', 'StudentPassword123!');
-                  } catch (e) {
-                    navigate('/dashboard');
-                  }
-                }
-                navigate('/dashboard');
-              }}
-              className={`px-3 py-1 rounded-xl font-bold transition-all ${
-                isStudent
-                  ? 'bg-white text-brand-600 shadow-sm border border-slate-200/80'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              🎓 Student
-            </button>
-            <button
-              onClick={async () => {
-                if (user?.role !== 'COUNSELOR') {
-                  try {
-                    await login('counselor@university.edu', 'CounselorPassword123!');
-                  } catch (e) {}
-                }
-                navigate('/counselor');
-              }}
-              className={`px-3 py-1 rounded-xl font-bold transition-all ${
-                isCounselor
-                  ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/80'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              🧭 Counselor
-            </button>
-            <button
-              onClick={async () => {
-                if (user?.role !== 'ADMIN') {
-                  try {
-                    await login('admin@university.edu', 'AdminPassword123!');
-                  } catch (e) {}
-                }
-                navigate('/admin');
-              }}
-              className={`px-3 py-1 rounded-xl font-bold transition-all ${
-                isAdmin
-                  ? 'bg-white text-amber-600 shadow-sm border border-slate-200/80'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              🛡️ Admin
-            </button>
-          </div>
-
+        {/* Middle: Student Tracking ID or Role Badge */}
+        <div className="hidden md:flex items-center gap-3">
           {isStudent && student?.trackingId && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-xs">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs">
               <span className="text-slate-500 font-medium">Tracking ID:</span>
-              <span className="font-mono font-bold text-brand-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+              <span className="font-mono font-bold text-brand-700 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
                 {student.trackingId}
               </span>
               <button
                 onClick={handleCopyTrackingId}
-                className="text-slate-400 hover:text-brand-600 transition-colors p-1"
+                className="text-slate-400 hover:text-brand-600 transition-colors p-1 cursor-pointer"
                 title="Copy Student Tracking ID"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
+            </div>
+          )}
+
+          {isCounselor && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-700 font-bold">
+              <span>🧭 Admissions Counseling Desk</span>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-bold">
+              <span>🛡️ University Administration</span>
             </div>
           )}
         </div>
