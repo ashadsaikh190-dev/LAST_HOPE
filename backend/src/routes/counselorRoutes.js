@@ -40,7 +40,9 @@ router.use(protect, authorize(ROLES.COUNSELOR, ROLES.ADMIN));
  */
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const counselorFilter = req.user.role === ROLES.COUNSELOR ? { assignedCounselor: req.user._id } : {};
+    const counselorFilter = req.user.role === ROLES.COUNSELOR
+      ? { $or: [{ assignedCounselor: req.user._id }, { assignedCounselor: null }, { assignedCounselor: { $exists: false } }] }
+      : {};
 
     const [
       totalStudents,
@@ -136,7 +138,9 @@ router.get('/assigned-students', async (req, res, next) => {
   try {
     const { sortBy = 'priority' } = req.query;
     const isCounselor = req.user.role === ROLES.COUNSELOR;
-    const filter = isCounselor ? { assignedCounselor: req.user._id } : {};
+    const filter = isCounselor
+      ? { $or: [{ assignedCounselor: req.user._id }, { assignedCounselor: null }, { assignedCounselor: { $exists: false } }] }
+      : {};
 
     const students = await Student.find(filter)
       .populate('selectedProgram currentApplication persona')
