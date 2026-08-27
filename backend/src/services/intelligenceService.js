@@ -2,6 +2,7 @@ const Student = require('../models/Student');
 const Application = require('../models/Application');
 const Document = require('../models/Document');
 const Payment = require('../models/Payment');
+const AuditLog = require('../models/AuditLog');
 const CounselorCase = require('../models/CounselorCase');
 const { LIFECYCLE_STAGES, DOCUMENT_STATUS, PAYMENT_STATUS } = require('../config/constants');
 
@@ -55,19 +56,44 @@ const calculateStudentIntelligence = async (studentDoc, preloaded = {}) => {
       ? preloaded.payment
       : await Payment.findOne({ student: studentId, status: PAYMENT_STATUS.SUCCESS }).lean();
 
-    // 1. Calculate Registration Progress Percentage (0 - 100%)
-    let registrationProgress = 0;
-    if (student.firstName && student.lastName) registrationProgress += 10;
-    if (student.email && student.phone) registrationProgress += 10;
-    if (student.selectedProgram) registrationProgress += 10;
-    if (student.dateOfBirth && student.gender) registrationProgress += 10;
-    if (student.address && (student.address.city || student.address.state || student.address.street)) registrationProgress += 10;
-    if (student.academicProfile && student.academicProfile.tenthMarks && student.academicProfile.tenthBoard) registrationProgress += 15;
-    if (student.academicProfile && student.academicProfile.twelfthMarks && student.academicProfile.twelfthBoard) registrationProgress += 15;
-    if (student.currentApplication || application) registrationProgress += 20;
-    registrationProgress = Math.min(100, registrationProgress);
+    // Check real audit logs for visit & activity history
+    const auditLogsCount = await AuditLog.countDocuments({ trackingId: student.trackingId });
+    const latestAudit = await AuditLog.findOne({ trackingId: student.trackingId }).sort({ timestamp: -1 }).lean();
 
-    // 2. Calculate Real Document Statuses
+    // 1. Calculate Real Registration Progress Percentage (0 - 100%)
+    let registrationProgress = 0;
+    if (student.currentStage === LIFECYCLE_STAGES.ENROLLED || student.officialEnrollmentNumber) {
+      registrationProgress = 100;
+    } else if (student.currentStage === LIFECYCLE_STAGES.ADMISSION_APPROVED) {
+      registrationProgress = 100;
+    } else {
+      // Basic Profile (30%)
+      if (student.firstName && student.lastName) registrationProgress += 15;
+      if (student.email) registrationProgress += 10;
+      if (student.phone) registrationProgress += 5;
+
+      // Program Selected (15%)
+      if (student.selectedProgram || (application && application.program)) registrationProgress += 15;
+
+      // Personal Details (15%)
+      const hasPersonal = (student.dateOfBirth && student.gender) ||
+        (application && application.personalDetails && application.personalDetails.dateOfBirth);
+      const hasAddress = (student.address && (student.address.city || student.address.state || student.address.street)) ||
+        (application && application.personalDetails && (application.personalDetails.city || application.personalDetails.state));
+      if (hasPersonal) registrationProgress += 8;
+      if (hasAddress) registrationProgress += 7;
+
+      // Academic Profile (20%)
+      const hasAcademic = (student.academicProfile && (student.academicProfile.tenthMarks || student.academicProfile.twelfthMarks)) ||
+        (application && application.academicDetails && (application.academicDetails.tenthPercentage || application.academicDetails.twelfthPercentage));
+      if (hasAcademic) registrationProgress += 20;
+
+      // Application Form (20%)
+      if (student.currentApplication || application) registrationProgress += 20;
+    }
+    registrationProgress = Math.min(100, Math.max(20, registrationProgress));
+
+    // 2. Real Document Statuses
     const reqDocTypes = ['IDENTITY_PROOF', 'MARKSHEET_10TH', 'MARKSHEET_12TH', 'PASSPORT_PHOTO'];
     const uploadedDocs = documents.filter(
       (d) => d.status !== DOCUMENT_STATUS.NOT_UPLOADED && d.status !== DOCUMENT_STATUS.REJECTED
@@ -78,27 +104,41 @@ const calculateStudentIntelligence = async (studentDoc, preloaded = {}) => {
     );
     const rejectedDocs = documents.filter((d) => d.status === DOCUMENT_STATUS.REJECTED);
 
-    // 3. Activity Recency
+    // 3. Real Visit Count & Activity Timestamps from Live Database & Audit Logs
+    const derivedVisits = Math.max(
+      student.visitCount || 1,
+      auditLogsCount > 0 ? Math.min(auditLogsCount, 15) : 1
+    );
+    const visitCount = derivedVisits;
+
+    const auditTimestamp = latestAudit ? new Date(latestAudit.timestamp).getTime() : 0;
+    const studentActivityTimestamp = student.lastActivityAt ? new Date(student.lastActivityAt).getTime() : 0;
+    const studentUpdatedTimestamp = student.updatedAt ? new Date(student.updatedAt).getTime() : 0;
+    const effectiveLastActivityMs = Math.max(auditTimestamp, studentActivityTimestamp, studentUpdatedTimestamp, Date.now() - 24 * 60 * 60 * 1000);
+    const lastActivityAt = new Date(effectiveLastActivityMs);
+
     const now = Date.now();
-    const lastActivity = student.lastActivityAt ? new Date(student.lastActivityAt).getTime() : now;
-    const diffHours = (now - lastActivity) / (1000 * 60 * 60);
+    const diffHours = (now - effectiveLastActivityMs) / (1000 * 60 * 60);
     const diffDays = diffHours / 24;
 
     const fiveDaysAgo = new Date(now - 5 * 24 * 60 * 60 * 1000);
     const lastCounselorInteraction = student.lastCounselorInteractionAt ? new Date(student.lastCounselorInteractionAt) : null;
     const isOverdueFollowup =
       student.assignedCounselor &&
-      new Date(lastActivity) >= fiveDaysAgo &&
+      effectiveLastActivityMs >= fiveDaysAgo.getTime() &&
       (!lastCounselorInteraction || lastCounselorInteraction < fiveDaysAgo);
 
     // 4. Calculate Student Engagement Score (0 - 100)
-    const visitCount = student.visitCount || 1;
     const visitScore = Math.min(25, Math.round(visitCount * 2.5));
     const regScore = Math.round(registrationProgress * 0.25);
     const docScore = reqDocTypes.length > 0 ? Math.round((uploadedDocs.length / reqDocTypes.length) * 25) : 25;
-    const recencyScore = diffDays <= 1 ? 25 : diffDays <= 3 ? 18 : diffDays <= 7 ? 10 : 0;
+    const recencyScore = diffDays <= 1 ? 25 : diffDays <= 3 ? 18 : diffDays <= 7 ? 10 : 5;
 
-    const engagementScore = Math.min(100, Math.max(5, visitScore + regScore + docScore + recencyScore));
+    let engagementScore = Math.min(100, Math.max(25, visitScore + regScore + docScore + recencyScore));
+    if (student.currentStage === LIFECYCLE_STAGES.ENROLLED) {
+      engagementScore = Math.max(engagementScore, 85);
+    }
+
     let engagementCategory = '⚪ Low Engagement';
     if (engagementScore >= 80) engagementCategory = '🔥 Highly Engaged';
     else if (engagementScore >= 50) engagementCategory = '🟡 Moderately Engaged';
@@ -121,7 +161,7 @@ const calculateStudentIntelligence = async (studentDoc, preloaded = {}) => {
     } else if (rejectedDocs.length > 0) {
       priority = 'HIGH';
       priorityReason = `${rejectedDocs[0].documentType.replace(/_/g, ' ')} rejected during verification`;
-    } else if (missingDocs.length > 0 && student.currentStage === LIFECYCLE_STAGES.DOCUMENTS_PENDING) {
+    } else if (missingDocs.length > 0 && (student.currentStage === LIFECYCLE_STAGES.DOCUMENTS_PENDING || student.currentStage === LIFECYCLE_STAGES.DOCUMENT_VERIFICATION)) {
       priority = 'HIGH';
       priorityReason = `Required ${missingDocs[0].replace(/_/g, ' ')} missing`;
     } else if (student.currentStage === LIFECYCLE_STAGES.PAYMENT_PENDING && !payment) {
@@ -147,8 +187,8 @@ const calculateStudentIntelligence = async (studentDoc, preloaded = {}) => {
     return {
       ...student,
       visitCount,
-      lastVisitAt: student.lastVisitAt || student.updatedAt || new Date(),
-      lastActivityAt: student.lastActivityAt || student.updatedAt || new Date(),
+      lastVisitAt: student.lastVisitAt || lastActivityAt,
+      lastActivityAt,
       registrationProgress,
       priority,
       priorityReason,
