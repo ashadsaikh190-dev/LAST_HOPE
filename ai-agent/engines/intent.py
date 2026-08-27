@@ -10,6 +10,13 @@ class IntentEngine:
                 r"poor", r"concession", r"discount", r"scholarship request", r"fee reduction"
             ]
         },
+        "REFUND_INQUIRY": {
+            "priority": 88,
+            "patterns": [
+                r"refund", r"money back", r"cancel admission", r"withdraw admission",
+                r"cancellation policy", r"fee refund", r"return money", r"cancel my seat"
+            ]
+        },
         "FEE_INQUIRY": {
             "priority": 82,
             "patterns": [

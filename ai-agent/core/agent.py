@@ -36,8 +36,8 @@ class AdmissionsAgent:
         
         kwargs = {
             "api_key": api_key.strip(),
-            "timeout": 8.0,
-            "max_retries": 1,
+            "timeout": 3.0,
+            "max_retries": 0,
         }
         if cfg["base_url"] and cfg["base_url"].strip():
             kwargs["base_url"] = cfg["base_url"].strip()
@@ -85,6 +85,37 @@ class AdmissionsAgent:
             f"[Router] Query='{message_text[:40]}...' -> Category={routing_decision.category.value} "
             f"(Confidence: {confidence:.2f}, DB Required: {routing_decision.requires_database})"
         )
+
+        # Step 2b: Fast-path for known-answer intents (refund, rankings, placements, campus)
+        #   These do NOT need any LLM call — return grounded answers immediately.
+        FAST_PATH_INTENTS = [
+            "REFUND_INQUIRY", "FEE_WAIVER_REQUEST", "COUNSELOR_REQUEST", "COMPLAINT",
+        ]
+        FAST_PATH_KEYWORDS = {
+            "refund": True, "money back": True, "cancel admission": True,
+            "withdraw admission": True, "cancellation policy": True,
+            "cancel my seat": True, "fee refund": True, "return money": True,
+            "rank": True, "ranking": True, "nirf": True, "naac": True,
+            "placement": True, "package": True, "salary": True,
+            "hostel": True, "campus": True, "facility": True, "dorm": True,
+        }
+        msg_lower_check = message_text.lower().strip()
+        needs_fast_path = (
+            primary_intent in FAST_PATH_INTENTS
+            or any(kw in msg_lower_check for kw in FAST_PATH_KEYWORDS)
+        )
+        if needs_fast_path:
+            return await self._fallback_response(
+                tracking_id=tracking_id,
+                student_id=student_id,
+                student_name=student_name,
+                current_stage=current_stage,
+                message_text=message_text,
+                primary_intent=primary_intent,
+                confidence=confidence,
+                student_profile=student_profile,
+                history=history,
+            )
 
         # Step 3: Handle MIXED Queries (University DB Grounding + Gemini Reasoning)
         if routing_decision.category == QueryCategory.MIXED and routing_decision.sub_queries:
@@ -295,7 +326,32 @@ class AdmissionsAgent:
 
             except Exception as llm_error:
                 error_type = type(llm_error).__name__
-                logger.warning(f"OpenAI completion failed ({error_type}: {llm_error}). Using integrated database reasoning.")
+                logger.warning(f"OpenAI completion failed ({error_type}: {llm_error}). Cascading to Gemini Provider.")
+                
+                # Secondary LLM Provider: Google Gemini with full university context
+                try:
+                    gemini = provider_factory.get_provider("gemini")
+                    logger.info(f"Gemini available: {await gemini.is_available()}, model: {gemini.get_model()}")
+                    if await gemini.is_available():
+                        logger.info("Calling Gemini generateContent...")
+                        gemini_res = await gemini.generate_response(
+                            messages=messages,
+                            temperature=cfg["temperature"],
+                            max_tokens=2048,
+                        )
+                        logger.info(f"Gemini response: success={gemini_res.is_success}, len={len(gemini_res.content)}, err={gemini_res.error_message}")
+                        if gemini_res.is_success and gemini_res.content.strip():
+                            return {
+                                "reply": gemini_res.content,
+                                "intent": primary_intent,
+                                "confidenceScore": confidence,
+                                "toolCalls": tool_calls_executed,
+                                "escalated": is_escalated,
+                                "route": "UNIVERSITY_GEMINI",
+                                "model": gemini.get_model(),
+                            }
+                except Exception as gemini_err:
+                    logger.warning(f"Gemini secondary provider error: {gemini_err}")
 
         # Fallback to verified database tool execution (zero hallucination)
         return await self._fallback_response(
@@ -307,6 +363,7 @@ class AdmissionsAgent:
             primary_intent=primary_intent,
             confidence=confidence,
             student_profile=student_profile,
+            history=history,
         )
 
     async def _fallback_response(
@@ -319,6 +376,7 @@ class AdmissionsAgent:
         primary_intent: str,
         confidence: float,
         student_profile: dict,
+        history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
         Verified tool execution and grounded heuristic reasoning when LLM quota is offline.
@@ -366,8 +424,25 @@ class AdmissionsAgent:
                 "model": "grounded_engine",
             }
 
-        # 1. Institutional Rankings & Accreditations
-        if any(w in msg_lower for w in ["rank", "ranking", "nirf", "naac", "accreditation", "reputation", "tier", "standing", "prestige"]):
+        # 1. Fee Refund & Admission Withdrawal Policy
+        if primary_intent == "REFUND_INQUIRY" or any(w in msg_lower for w in ["refund", "money back", "cancel admission", "withdraw admission", "cancellation policy", "fee refund", "cancel my seat"]):
+            reply = (
+                f"📄 **University Fee Refund & Admission Cancellation Policy:**\n\n"
+                f"In accordance with UGC guidelines and institutional regulations, tuition fee refunds are calculated based on when the formal withdrawal notice is submitted:\n\n"
+                f"• **100% Fee Refund** (minus max ₹1,000 processing fee): If requested **15 days or more** before the formally notified last date of admission.\n"
+                f"• **90% Fee Refund**: If requested **less than 15 days** before the formally notified last date of admission.\n"
+                f"• **80% Fee Refund**: If requested **15 days or less** after the formally notified last date of admission.\n"
+                f"• **50% Fee Refund**: If requested between **16 and 30 days** after the formally notified last date of admission.\n"
+                f"• **0% Refund**: If requested **more than 30 days** after the formally notified last date of admission.\n\n"
+                f"📌 **Step-by-Step Refund Process:**\n"
+                f"1. Log into your **Student Portal $\rightarrow$ Application Status $\rightarrow$ Request Withdrawal / Refund**.\n"
+                f"2. Provide your active bank account details (Account Number, IFSC, and Bank Branch) with a scanned cancelled cheque.\n"
+                f"3. Upon finance verification, the eligible refund amount is credited via direct bank transfer (NEFT/RTGS) within **7–10 working days**.\n\n"
+                f"Would you like me to connect you with an **Admissions Finance Officer** or open a priority support ticket for your tracking ID?"
+            )
+
+        # 2. Institutional Rankings & Accreditations
+        elif any(w in msg_lower for w in ["rank", "ranking", "nirf", "naac", "accreditation", "reputation", "tier", "standing", "prestige"]):
             reply = (
                 f"🏆 **University Rankings & Accreditations:**\n\n"
                 f"• **NIRF Ranking**: Ranked **Top 35 Engineering & Technology Institutions** nationally.\n"
@@ -378,7 +453,7 @@ class AdmissionsAgent:
                 f"Would you like to explore program cutoffs, fees, or placement statistics for a specific department?"
             )
 
-        # 2. Placements & Career Statistics
+        # 3. Placements & Career Statistics
         elif any(w in msg_lower for w in ["placement", "package", "salary", "recruiter", "recruiters", "highest package", "average package", "job", "career", "hiring"]):
             reply = (
                 f"💼 **University Placement Highlights (Latest Academic Batch):**\n\n"
@@ -392,7 +467,7 @@ class AdmissionsAgent:
                 f"We also offer guaranteed pre-placement training, coding bootcamps, and direct internship incubation on campus."
             )
 
-        # 3. Campus, Hostels & Facilities
+        # 4. Campus, Hostels & Facilities
         elif any(w in msg_lower for w in ["hostel", "campus", "facility", "facilities", "dorm", "accommodation", "library", "sports", "mess", "canteen", "wifi", "lab"]):
             reply = (
                 f"🏫 **Campus Life & Infrastructure:**\n\n"
@@ -404,7 +479,7 @@ class AdmissionsAgent:
                 f"• **Labs & Innovation**: State-of-the-art AI & GPU computing clusters, IoT research centers, and robotics laboratories."
             )
 
-        # 4. Program Fees & Discovery via Live Backend Tools
+        # 5. Program Fees & Discovery via Live Backend Tools
         elif primary_intent in ["FEE_INQUIRY", "PROGRAM_DISCOVERY"] or any(w in msg_lower for w in ["fee", "tuition", "cost"]):
             programs_data = await tool_client.execute_tool("getPrograms", tracking_id=tracking_id)
             tool_calls.append({"toolName": "getPrograms", "result": programs_data, "status": "SUCCESS"})
@@ -444,7 +519,7 @@ class AdmissionsAgent:
             else:
                 reply = "Our university offers accredited B.Tech and MBA degrees. Annual tuition ranges from ₹85,000 to ₹1,40,000 per year."
 
-        # 5. Document Verification Status
+        # 6. Document Verification Status
         elif primary_intent in ["DOCUMENT_STATUS", "DOCUMENT_REPLACEMENT"] or any(w in msg_lower for w in ["document", "marksheet", "aadhaar", "verified"]):
             verif_data = await tool_client.execute_tool("getVerificationStatus", tracking_id=tracking_id)
             tool_calls.append({"toolName": "getVerificationStatus", "result": verif_data, "status": "SUCCESS"})
@@ -458,7 +533,7 @@ class AdmissionsAgent:
                 missing = missing_data.get("missingDocuments", []) if isinstance(missing_data, dict) else []
                 reply = f"You have pending document uploads. Required documents: {', '.join(missing) if missing else '10th & 12th marksheets, Identity proof'}."
 
-        # 6. Eligibility Cutoffs & Personalized Marks Evaluation
+        # 7. Eligibility Cutoffs & Personalized Marks Evaluation
         elif primary_intent == "ELIGIBILITY_QUERY" or any(w in msg_lower for w in ["eligi", "elligi", "cutoff", "criteria", "board", "marks", "qualify", "12th", "10th"]):
             programs_data = await tool_client.execute_tool("getPrograms", tracking_id=tracking_id)
             tool_calls.append({"toolName": "getPrograms", "result": programs_data, "status": "SUCCESS"})
@@ -538,7 +613,7 @@ class AdmissionsAgent:
                         f"Please share your 12th percentage and I will check your eligibility across all departments."
                     )
 
-        # 7. Enrollment Queries
+        # 8. Enrollment Queries
         elif primary_intent == "ENROLLMENT_QUERY":
             enroll_data = await tool_client.execute_tool("getEnrollmentNumber", tracking_id=tracking_id)
             tool_calls.append({"toolName": "getEnrollmentNumber", "result": enroll_data, "status": "SUCCESS"})
@@ -547,7 +622,7 @@ class AdmissionsAgent:
             else:
                 reply = f"Your current admission stage is **{current_stage}**. Once your document verification and fee payment are completed, your enrollment number will be generated automatically."
 
-        # 8. Greetings & Introduction
+        # 9. Greetings & Introduction
         elif any(w in msg_lower for w in ["hi", "hello", "hey", "who are you", "what can you do", "help"]):
             reply = (
                 f"Hello {student_name}! 👋 I am your Autonomous AI Admissions & Academic Assistant for Tracking ID **{tracking_id}**.\n\n"
@@ -556,78 +631,55 @@ class AdmissionsAgent:
                 f"• 🏆 **Institutional Standing**: NIRF rankings, NAAC accreditation, and achievements\n"
                 f"• 💼 **Placements**: Salary packages, top recruiters, and career statistics\n"
                 f"• 🎓 **Programs & Fees**: Tuition structure for CSE, AI & DS, ECE, MECH, and MBA\n"
+                f"• 📄 **Refunds & Withdrawals**: Full UGC fee refund schedules and procedures\n"
                 f"• 📄 **Documents**: Real-time OCR verification results and missing upload alerts\n"
                 f"• 🤝 **Counselor Support**: Dedicated escalation for scholarships and fee waivers\n\n"
                 f"What would you like to ask or explore?"
             )
 
-        # 9. Programming, Computer Science, and Coding
-        elif any(w in msg_lower for w in ["python", "javascript", "code", "coding", "programming", "function", "algorithm", "data structure", "sql", "react", "api", "bug", "html", "css", "java", "c++", "debug"]):
-            reply = (
-                f"💻 **Programming & Software Engineering Insights:**\n\n"
-                f"Here is a structured explanation regarding your technical question:\n\n"
-                f"1. **Core Concept**: Writing clean, modular, and performant code relies on good architecture, time/space complexity optimization, and proper error handling.\n"
-                f"2. **Best Practices**:\n"
-                f"   - Keep functions focused (Single Responsibility Principle).\n"
-                f"   - Use meaningful variable and function naming.\n"
-                f"   - Write unit tests and maintain type safety where applicable.\n\n"
-                f"```python\n"
-                f"# Example: Clean and robust implementation pattern\n"
-                f"def process_data(items: list) -> list:\n"
-                f"    return [item.strip().title() for item in items if item]\n"
-                f"```\n\n"
-                f"If you have a specific code snippet or problem you'd like me to solve or debug, paste it right here!"
-            )
-
-        # 10. AI, Machine Learning, and Data Science
-        elif any(w in msg_lower for w in ["machine learning", "deep learning", "neural network", "chatgpt", "llm", "data science", "nlp", "computer vision"]):
-            reply = (
-                f"🤖 **Artificial Intelligence & Machine Learning Overview:**\n\n"
-                f"• **Machine Learning (ML)**: Algorithms that learn statistical patterns from data (e.g., Regression, Random Forests, SVMs).\n"
-                f"• **Deep Learning (DL)**: Multi-layer neural networks modeled after biological brains, powering Computer Vision and Natural Language Processing.\n"
-                f"• **Large Language Models (LLMs)**: Transformer-based architectures with self-attention mechanisms that understand context and generate human-grade language.\n\n"
-                f"Our university offers a specialized **B.Tech in Artificial Intelligence & Data Science (AI & DS)** with dedicated GPU research clusters and industry projects. Would you like details on this curriculum?"
-            )
-
-        # 11. Mathematics, Arithmetic & Calculations (Strict arithmetic detection)
-        elif (
-            ("calculate" in msg_lower or "solve equation" in msg_lower or "evaluate" in msg_lower or "what is" in msg_lower)
-            and re.search(r"\b\d+\.?\d*\s*[\+\*\/\^]\s*\d+\.?\d*\b", msg_lower)
-            and not any(w in msg_lower for w in ["board", "12th", "10th", "fee", "cost", "rank", "percent", "%", "marks", "cutoff", "eligi", "elligi"])
-        ):
-            clean_expr = re.sub(r"[^0-9+\-*/().\s]", "", msg_lower).strip()
-            math_result = None
-            if clean_expr and len(clean_expr) >= 3 and any(op in clean_expr for op in ["+", "-", "*", "/"]):
-                try:
-                    math_result = eval(clean_expr, {"__builtins__": None}, {})
-                except Exception:
-                    pass
-            
-            if math_result is not None:
-                reply = (
-                    f"🔢 **Calculation Result:**\n\n"
-                    f"$$\\text{{{clean_expr}}} = \\mathbf{{{math_result}}}$$\n\n"
-                    f"Calculation: `{clean_expr} = {math_result}`\n\n"
-                    f"Feel free to provide any other mathematical problems, equations, or algebra questions!"
-                )
-            else:
-                reply = (
-                    f"📐 **Mathematics & Analytical Reasoning:**\n\n"
-                    f"I can help you solve algebra, calculus, discrete math, statistics, and probability problems. "
-                    f"Please share the full equation or problem statement, and I will walk you through the step-by-step solution!"
-                )
-
-        # 12. General Knowledge & Universal Chat Answering
+        # 10. Dynamic Generative Answering via Gemini for ANY other query
         else:
+            try:
+                gemini = provider_factory.get_provider("gemini")
+                if await gemini.is_available():
+                    system_prompt = (
+                        f"You are the Autonomous Admissions, Academic & Universal AI Assistant for the University, "
+                        f"answering questions with the conversational brilliance, depth, and helpfulness of ChatGPT.\n"
+                        f"Student Name: {student_name}, Tracking ID: {tracking_id}, Current Stage: {current_stage}.\n"
+                        f"Answer the user's message accurately, thoroughly, and encourage them with clean Markdown formatting."
+                    )
+                    gen_messages = [{"role": "system", "content": system_prompt}]
+                    if history:
+                        for h in history[-6:]:
+                            r = h.get("role", "user")
+                            c = h.get("content", "")
+                            if r in ["user", "assistant", "system"] and c:
+                                gen_messages.append({"role": r, "content": c})
+                    gen_messages.append({"role": "user", "content": message_text})
+                    
+                    gemini_res = await gemini.generate_response(
+                        messages=gen_messages,
+                        temperature=0.7,
+                        max_tokens=2048,
+                    )
+                    if gemini_res.is_success and gemini_res.content.strip():
+                        return {
+                            "reply": gemini_res.content,
+                            "intent": primary_intent,
+                            "confidenceScore": confidence,
+                            "toolCalls": tool_calls,
+                            "escalated": False,
+                            "route": "DYNAMIC_GEMINI",
+                            "model": gemini.get_model(),
+                        }
+            except Exception as e:
+                logger.warning(f"Dynamic fallback Gemini failed: {e}")
+
+            # Ultimate safe response if offline
             reply = (
-                f"Hello {student_name}! 🌟\n\n"
-                f"Regarding: *\"{message_text}\"*\n\n"
-                f"I am fully equipped to assist you with a broad spectrum of academic and general topics:\n\n"
-                f"• 📚 **Academic & Study Guidance**: Subject explanations, curriculum advice, and exam preparation strategies.\n"
-                f"• 💻 **Technology & Coding**: Programming help, algorithmic problem solving, and software engineering.\n"
-                f"• 🎓 **University Admissions**: Degree details (CSE, AI & DS, ECE, MECH, MBA), fee schedules, scholarship applications, and document OCR verification.\n"
-                f"• 💬 **Campus Life**: Hostels, digital library, sports facilities, and placement packages (Highest: ₹54.2 LPA).\n\n"
-                f"How would you like to proceed?"
+                f"Hello {student_name}! I received your inquiry: \"{message_text}\". "
+                f"I am here to assist with university admissions, cutoffs, tuition fees, course curriculum, and refund guidelines. "
+                f"Please let me know if you would like me to connect you with an admissions counselor."
             )
 
         return {
