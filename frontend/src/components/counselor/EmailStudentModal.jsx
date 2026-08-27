@@ -138,18 +138,34 @@ ashadsaikh7@gmail.com`;
     setSending(true);
     setFeedback(null);
 
+    const cleanEmail = (studentEmail || '').trim();
+
     const templateParams = {
-      student_name: studentName,
-      student_email: studentEmail,
-      to_email: studentEmail,
+      // Recipient Email Aliases (covers any EmailJS template field setup)
+      to_email: cleanEmail,
+      student_email: cleanEmail,
+      email: cleanEmail,
+      user_email: cleanEmail,
+      recipient_email: cleanEmail,
+      recipient: cleanEmail,
+      to: cleanEmail,
+      reply_to: 'ashadsaikh7@gmail.com',
+
+      // Names
       to_name: studentName,
-      tracking_id: trackingId,
-      program: programName,
-      subject: subject.trim(),
-      message: message.trim(),
+      student_name: studentName,
+      name: studentName,
+      user_name: studentName,
+      from_name: 'Ashad (GIET Admission Cell)',
       counsellor_name: 'Ashad',
       counsellor_email: 'ashadsaikh7@gmail.com',
-      reply_to: 'ashadsaikh7@gmail.com',
+
+      // Application Details
+      tracking_id: trackingId,
+      program: programName,
+      program_name: programName,
+      subject: subject.trim(),
+      message: message.trim(),
     };
 
     try {
