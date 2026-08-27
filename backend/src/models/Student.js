@@ -108,6 +108,14 @@ const studentSchema = new mongoose.Schema(
     lastCounselorInteractionAt: {
       type: Date,
     },
+    visitCount: {
+      type: Number,
+      default: 1,
+    },
+    lastVisitAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,

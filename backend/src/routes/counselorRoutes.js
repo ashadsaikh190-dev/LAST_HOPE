@@ -27,6 +27,7 @@ const { logAudit } = require('../services/auditService');
 const { transitionStudentStage } = require('../services/stateMachineService');
 const { createNotification } = require('../services/notificationService');
 const { EVENTS, dispatchEvent } = require('../services/eventBusService');
+const { calculateStudentIntelligence } = require('../services/intelligenceService');
 const { emitToStudent, emitToCounselors } = require('../config/socket');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
@@ -35,10 +36,12 @@ router.use(protect, authorize(ROLES.COUNSELOR, ROLES.ADMIN));
 
 /**
  * @route   GET /api/counselor/dashboard
- * @desc    Get real-time database calculated metrics & conversion funnel
+ * @desc    Get real-time database calculated metrics, summary indicators, & conversion funnel
  */
 router.get('/dashboard', async (req, res, next) => {
   try {
+    const counselorFilter = req.user.role === ROLES.COUNSELOR ? { assignedCounselor: req.user._id } : {};
+
     const [
       totalStudents,
       totalLeads,
@@ -51,6 +54,7 @@ router.get('/dashboard', async (req, res, next) => {
       totalEnrollments,
       totalAiActions,
       totalCounselorDecisions,
+      assignedStudentsRaw,
     ] = await Promise.all([
       Student.countDocuments(),
       Lead.countDocuments(),
@@ -63,6 +67,7 @@ router.get('/dashboard', async (req, res, next) => {
       Enrollment.countDocuments(),
       AIAction.countDocuments(),
       CounselorCase.countDocuments({ status: COUNSELOR_CASE_STATUS.RESOLVED }),
+      Student.find(counselorFilter).populate('selectedProgram currentApplication').lean(),
     ]);
 
     // Calculate real conversion rates from database counts
@@ -73,6 +78,19 @@ router.get('/dashboard', async (req, res, next) => {
     const totalOperations = totalAiActions + totalCounselorDecisions;
     const aiAutomationRate = totalOperations > 0 ? Math.round((totalAiActions / totalOperations) * 100) : 100;
     const counselorInterventionRate = 100 - aiAutomationRate;
+
+    // Calculate intelligence summary metrics across assigned students
+    const intelligentAssigned = await Promise.all(
+      assignedStudentsRaw.map((s) => calculateStudentIntelligence(s))
+    );
+
+    const highPriorityCount = intelligentAssigned.filter((s) => s.priority === 'HIGH').length;
+    const mediumPriorityCount = intelligentAssigned.filter((s) => s.priority === 'MEDIUM').length;
+    const lowPriorityCount = intelligentAssigned.filter((s) => s.priority === 'LOW').length;
+    const totalScore = intelligentAssigned.reduce((acc, s) => acc + (s.engagementScore || 0), 0);
+    const totalReg = intelligentAssigned.reduce((acc, s) => acc + (s.registrationProgress || 0), 0);
+    const avgEngagement = intelligentAssigned.length > 0 ? Math.round(totalScore / intelligentAssigned.length) : 0;
+    const avgRegistrationProgress = intelligentAssigned.length > 0 ? Math.round(totalReg / intelligentAssigned.length) : 0;
 
     // Recent cases
     const recentCases = await CounselorCase.find({ status: COUNSELOR_CASE_STATUS.OPEN })
@@ -95,9 +113,64 @@ router.get('/dashboard', async (req, res, next) => {
         appToEnrollConversion,
         aiAutomationRate,
         counselorInterventionRate,
+        // Summary Indicators for Counselor Intelligence
+        assignedStudentsCount: intelligentAssigned.length,
+        highPriorityCount,
+        mediumPriorityCount,
+        lowPriorityCount,
+        avgEngagement,
+        avgRegistrationProgress,
       },
       recentCases,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/counselor/assigned-students
+ * @desc    List all assigned students enriched with 4 intelligence metrics & sorting
+ */
+router.get('/assigned-students', async (req, res, next) => {
+  try {
+    const { sortBy = 'priority' } = req.query;
+    const isCounselor = req.user.role === ROLES.COUNSELOR;
+    const filter = isCounselor ? { assignedCounselor: req.user._id } : {};
+
+    const students = await Student.find(filter)
+      .populate('selectedProgram currentApplication persona')
+      .lean();
+
+    // Calculate intelligence metrics for each student in parallel from 100% real DB data
+    const enrichedStudents = await Promise.all(
+      students.map((student) => calculateStudentIntelligence(student))
+    );
+
+    // Apply sorting
+    enrichedStudents.sort((a, b) => {
+      if (sortBy === 'priority') {
+        const priorityWeight = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+        const diff = (priorityWeight[b.priority] || 1) - (priorityWeight[a.priority] || 1);
+        if (diff !== 0) return diff;
+        return (b.engagementScore || 0) - (a.engagementScore || 0);
+      }
+      if (sortBy === 'engagement') {
+        return (b.engagementScore || 0) - (a.engagementScore || 0);
+      }
+      if (sortBy === 'registration') {
+        return (a.registrationProgress || 0) - (b.registrationProgress || 0);
+      }
+      if (sortBy === 'visits') {
+        return (b.visitCount || 0) - (a.visitCount || 0);
+      }
+      if (sortBy === 'activity') {
+        return new Date(b.lastActivityAt || 0) - new Date(a.lastActivityAt || 0);
+      }
+      return 0;
+    });
+
+    return sendSuccess(res, enrichedStudents);
   } catch (error) {
     next(error);
   }
@@ -135,11 +208,16 @@ router.get('/search', protect, async (req, res, next) => {
       };
     }
 
-    // 1. Search directly in Student
-    const students = await Student.find(studentFilter)
+    // 1. Search directly in Student & enrich with intelligence metrics
+    const rawStudents = await Student.find(studentFilter)
       .populate('selectedProgram currentApplication persona')
       .sort({ updatedAt: -1 })
-      .limit(20);
+      .limit(30)
+      .lean();
+
+    const students = await Promise.all(
+      rawStudents.map((s) => calculateStudentIntelligence(s))
+    );
 
     // 2. Search in Applications
     const applications = Object.keys(appFilter).length > 0 ? await Application.find(appFilter).populate('student program').limit(20) : [];

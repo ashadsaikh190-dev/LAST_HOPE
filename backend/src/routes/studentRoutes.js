@@ -10,6 +10,7 @@ const { authorize } = require('../middleware/role');
 const { ROLES, COUNSELOR_CASE_PRIORITY, COUNSELOR_CASE_CATEGORY } = require('../config/constants');
 const { generateCaseId } = require('../utils/idGenerator');
 const { logAudit } = require('../services/auditService');
+const { trackStudentVisit } = require('../services/intelligenceService');
 const { emitToCounselors } = require('../config/socket');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
@@ -25,6 +26,9 @@ router.get('/me', protect, authorize(ROLES.STUDENT), async (req, res, next) => {
     if (!student) {
       return sendError(res, 'Student profile not found', 404, 'NOT_FOUND');
     }
+
+    // Record throttled student portal session visit
+    await trackStudentVisit(student._id);
 
     return sendSuccess(res, student);
   } catch (error) {
