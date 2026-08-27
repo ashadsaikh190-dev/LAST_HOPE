@@ -11,7 +11,7 @@ class IntentEngine:
             ]
         },
         "FEE_INQUIRY": {
-            "priority": 60,
+            "priority": 82,
             "patterns": [
                 r"fee", r"cost", r"tuition", r"expense", r"payment", r"how much", r"scholarship"
             ]
@@ -23,9 +23,13 @@ class IntentEngine:
             ]
         },
         "ELIGIBILITY_QUERY": {
-            "priority": 80,
+            "priority": 84,
             "patterns": [
-                r"eligible", r"eligibility", r"cutoff", r"marks required", r"criteria", r"percentage needed"
+                r"eligi", r"elligi", r"cutoff", r"cut-off", r"cut off",
+                r"marks required", r"percentage required", r"percentage needed",
+                r"criteria", r"qualify", r"qualifying", r"min marks", r"minimum marks",
+                r"12th", r"10th", r"board", r"percentage", r"marks",
+                r"can i get admission", r"am i eligible", r"can i apply", r"still eligible", r"still elligible"
             ]
         },
         "DOCUMENT_STATUS": {

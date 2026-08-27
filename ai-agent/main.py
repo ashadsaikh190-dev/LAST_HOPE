@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     studentId: Optional[str] = None
     message: str
     conversationId: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = None
 
 class IntentRequest(BaseModel):
     text: str
@@ -70,6 +71,7 @@ async def chat_endpoint(req: ChatRequest, x_ai_secret_key: Optional[str] = Heade
         student_id=req.studentId or "",
         message_text=req.message,
         conversation_id=req.conversationId,
+        history=req.history,
     )
     return result
 
@@ -90,6 +92,12 @@ def summarize_case_endpoint(req: CaseSummaryRequest):
     )
     return {"summary": summary}
 
+@app.post("/ai/route-query")
+def route_query_endpoint(req: IntentRequest):
+    from router.semantic_router import query_router
+    decision = query_router.route_query(req.text)
+    return decision.model_dump()
+
 @app.post("/ai/decide-next-action")
 def decide_next_action_endpoint(req: NextActionRequest):
     return action_engine.decide_next_action(
@@ -102,6 +110,7 @@ async def process_conversation_endpoint(req: ChatRequest):
         tracking_id=req.trackingId,
         student_id=req.studentId or "",
         message_text=req.message,
+        history=req.history,
     )
 
 if __name__ == "__main__":

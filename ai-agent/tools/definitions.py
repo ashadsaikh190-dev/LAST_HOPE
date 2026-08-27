@@ -121,3 +121,17 @@ AI_TOOLS = [
         },
     },
 ]
+
+def get_openai_tools():
+    """Convert AI_TOOLS into OpenAI function calling schema"""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["parameters"],
+            }
+        }
+        for t in AI_TOOLS
+    ]

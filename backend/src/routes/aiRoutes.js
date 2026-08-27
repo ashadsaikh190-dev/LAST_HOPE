@@ -58,6 +58,15 @@ router.post('/chat', protect, authorize(ROLES.STUDENT), async (req, res, next) =
       content: userText.trim(),
     });
 
+    // Retrieve previous conversation history for multi-turn context
+    const previousMessages = await Message.find({ conversation: conversation._id })
+      .sort({ createdAt: 1 })
+      .limit(10);
+    const historyPayload = previousMessages.map((m) => ({
+      role: m.sender === 'STUDENT' ? 'user' : 'assistant',
+      content: m.content,
+    }));
+
     // Call Python FastAPI AI Agent service
     let aiResponseData = null;
     try {
@@ -68,10 +77,11 @@ router.post('/chat', protect, authorize(ROLES.STUDENT), async (req, res, next) =
           studentId: String(student._id),
           message: userText,
           conversationId: String(conversation._id),
+          history: historyPayload,
         },
         {
           headers: { 'X-AI-Secret-Key': config.AI_SECRET_KEY },
-          timeout: 6000,
+          timeout: 30000,
         }
       );
       aiResponseData = pyResponse.data;
@@ -242,6 +252,66 @@ router.post('/tool-execute', async (req, res, next) => {
     });
 
     return sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/ai/public-chat
+ * @desc    Public admissions AI assistant endpoint for prospective students & visitors
+ */
+router.post('/public-chat', async (req, res, next) => {
+  try {
+    const { message: userText, trackingId, history } = req.body;
+    if (!userText || !userText.trim()) {
+      return sendError(res, 'Message text is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const tid = trackingId || 'PROSPECT-VISITOR';
+
+    let aiResponseData = null;
+    try {
+      const pyResponse = await axios.post(
+        `${config.AI_SERVICE_URL}/ai/chat`,
+        {
+          trackingId: tid,
+          studentId: '',
+          message: userText.trim(),
+          history: history || [],
+        },
+        {
+          headers: { 'X-AI-Secret-Key': config.AI_SECRET_KEY },
+          timeout: 30000,
+        }
+      );
+      aiResponseData = pyResponse.data;
+    } catch (pyErr) {
+      console.warn(`[AI Agent Public Chat] Python service error: ${pyErr.message}`);
+    }
+
+    if (!aiResponseData) {
+      aiResponseData = {
+        reply: "Hello! 👋 I am the University AI Assistant. I can assist you with degree programs (CSE, AI & DS, ECE, MBA), fees, eligibility cutoffs, campus facilities, and general academic inquiries. How can I help you today?",
+        intent: "GENERAL_QUERY",
+        confidenceScore: 0.90,
+        toolCalls: [],
+        escalated: false,
+      };
+    }
+
+    return sendSuccess(res, {
+      aiMessage: {
+        _id: `public-ai-${Date.now()}`,
+        sender: 'AI',
+        content: aiResponseData.reply,
+        intent: aiResponseData.intent || 'GENERAL_QUERY',
+        confidenceScore: aiResponseData.confidenceScore || 0.90,
+        toolCalls: aiResponseData.toolCalls || [],
+        escalated: aiResponseData.escalated || false,
+        createdAt: new Date().toISOString(),
+      },
+    });
   } catch (error) {
     next(error);
   }
