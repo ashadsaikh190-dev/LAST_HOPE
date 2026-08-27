@@ -119,7 +119,12 @@ export const DocumentReviewDesk = () => {
                 </div>
 
                 {verif ? (
-                  <OCRDiffViewer verification={verif} application={doc.application} documentViewUrl={doc.viewUrl} />
+                  <OCRDiffViewer
+                    verification={verif}
+                    application={doc.application}
+                    documentViewUrl={doc.viewUrl}
+                    documentType={doc.documentType}
+                  />
                 ) : (
                   <div className="p-4 rounded-2xl bg-slate-50 text-xs text-slate-400 text-center">
                     Pending OCR analysis
