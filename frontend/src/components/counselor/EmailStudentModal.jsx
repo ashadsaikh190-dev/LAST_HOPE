@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import emailjs from '@emailjs/browser';
-import { Mail, X, RotateCcw, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, X, RotateCcw, Send, CheckCircle2, AlertCircle, Loader2, Settings, ChevronDown, ChevronUp, Key } from 'lucide-react';
 import api from '../../api/axios';
 
 export const EmailStudentModal = ({
@@ -47,7 +47,20 @@ ashadsaikh7@gmail.com`;
   const [subject, setSubject] = useState(defaultSubject);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error' | 'info', text: '' }
+  const [showConfig, setShowConfig] = useState(false);
+
+  // EmailJS Credentials (reads from import.meta.env or localStorage)
+  const [serviceId, setServiceId] = useState(
+    () => localStorage.getItem('emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || ''
+  );
+  const [templateId, setTemplateId] = useState(
+    () => localStorage.getItem('emailjs_template_id') || import.meta.env.VITE_EMAILJS_TEMPLATE_ID || ''
+  );
+  const [publicKey, setPublicKey] = useState(
+    () => localStorage.getItem('emailjs_public_key') || import.meta.env.VITE_EMAILJS_PUBLIC_KEY || ''
+  );
+
   const isSendingRef = useRef(false);
 
   // Initialize or reset form when modal opens or student changes
@@ -58,6 +71,18 @@ ashadsaikh7@gmail.com`;
       setFeedback(null);
       setSending(false);
       isSendingRef.current = false;
+
+      const currentServiceId = localStorage.getItem('emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
+      const currentTemplateId = localStorage.getItem('emailjs_template_id') || import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
+      const currentPublicKey = localStorage.getItem('emailjs_public_key') || import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+
+      setServiceId(currentServiceId);
+      setTemplateId(currentTemplateId);
+      setPublicKey(currentPublicKey);
+
+      if (!currentServiceId || !currentTemplateId || !currentPublicKey) {
+        setShowConfig(true);
+      }
     }
   }, [isOpen, student]);
 
@@ -83,6 +108,19 @@ ashadsaikh7@gmail.com`;
       return;
     }
 
+    const effectiveServiceId = (serviceId || '').trim();
+    const effectiveTemplateId = (templateId || '').trim();
+    const effectivePublicKey = (publicKey || '').trim();
+
+    if (!effectiveServiceId || !effectiveTemplateId || !effectivePublicKey) {
+      setShowConfig(true);
+      setFeedback({
+        type: 'error',
+        text: 'Please provide your EmailJS Service ID, Template ID, and Public Key below to send.',
+      });
+      return;
+    }
+
     if (!subject.trim() || !message.trim()) {
       setFeedback({
         type: 'error',
@@ -91,13 +129,14 @@ ashadsaikh7@gmail.com`;
       return;
     }
 
+    // Save to localStorage for convenience
+    localStorage.setItem('emailjs_service_id', effectiveServiceId);
+    localStorage.setItem('emailjs_template_id', effectiveTemplateId);
+    localStorage.setItem('emailjs_public_key', effectivePublicKey);
+
     isSendingRef.current = true;
     setSending(true);
     setFeedback(null);
-
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
 
     const templateParams = {
       student_name: studentName,
@@ -114,14 +153,8 @@ ashadsaikh7@gmail.com`;
     };
 
     try {
-      if (!serviceId || !templateId || !publicKey) {
-        console.warn(
-          '[EmailJS] Configuration missing: VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, or VITE_EMAILJS_PUBLIC_KEY is not set in environment.'
-        );
-      }
-
       // Send email via EmailJS
-      await emailjs.send(serviceId, templateId, templateParams, publicKey);
+      await emailjs.send(effectiveServiceId, effectiveTemplateId, templateParams, effectivePublicKey);
 
       setFeedback({
         type: 'success',
@@ -142,21 +175,20 @@ ashadsaikh7@gmail.com`;
         onEmailSent();
       }
 
-      // Auto close modal after 2 seconds on success
+      // Auto close modal after 2.5 seconds on success
       setTimeout(() => {
         onClose();
-      }, 2200);
+      }, 2500);
     } catch (error) {
       console.error('[EmailJS Error]', error);
       const errorMsg =
         error?.text ||
         error?.message ||
-        'Unable to send email. Please try again.';
+        'Unable to send email. Please verify your EmailJS keys and template parameters.';
+      setShowConfig(true);
       setFeedback({
         type: 'error',
-        text: errorMsg.includes('Invalid') || errorMsg.includes('service')
-          ? `EmailJS Service Error: ${errorMsg}`
-          : 'Unable to send email. Please try again.',
+        text: `EmailJS Error: ${errorMsg}`,
       });
     } finally {
       setSending(false);
@@ -301,6 +333,79 @@ ashadsaikh7@gmail.com`;
             <span className="font-mono text-[10px] text-slate-400">
               Tracking ID: {trackingId}
             </span>
+          </div>
+
+          {/* EmailJS Credentials Accordion */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowConfig(!showConfig)}
+              className="w-full px-4 py-2.5 flex items-center justify-between text-[11px] font-bold text-slate-700 hover:bg-slate-100/80 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Key className="w-3.5 h-3.5 text-brand-600" />
+                <span>EmailJS Service & API Credentials</span>
+                {(!serviceId || !templateId || !publicKey) && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    Configuration Needed
+                  </span>
+                )}
+              </div>
+              {showConfig ? (
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {showConfig && (
+              <div className="p-4 pt-2 border-t border-slate-200 space-y-3 bg-white text-xs">
+                <p className="text-[11px] text-slate-500">
+                  Enter your EmailJS credentials from your dashboard (or set them in your <code className="font-mono text-brand-700">.env</code> file).
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                      Service ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={serviceId}
+                      onChange={(e) => setServiceId(e.target.value)}
+                      placeholder="e.g. service_giet"
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-[11px] bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                      Template ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={templateId}
+                      onChange={(e) => setTemplateId(e.target.value)}
+                      placeholder="e.g. template_reminder"
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-[11px] bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                      Public Key <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={publicKey}
+                      onChange={(e) => setPublicKey(e.target.value)}
+                      placeholder="e.g. user_xxx / public_key"
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-[11px] bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Modal Footer Buttons */}
