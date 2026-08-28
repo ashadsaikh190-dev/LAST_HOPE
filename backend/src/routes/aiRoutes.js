@@ -154,8 +154,18 @@ router.post('/chat', protect, authorize(ROLES.STUDENT), async (req, res, next) =
         } else {
           replyContent = `Your current stage is **${student.currentStage}**. Official Enrollment Numbers are generated automatically once your application, document verification, eligibility check, and admission offer are finalized.`;
         }
+      } else if (lower.includes('university name') || lower.includes('what university') || lower.includes('giet') || lower.includes('about university') || lower.includes('location')) {
+        detectedIntent = 'UNIVERSITY_KNOWLEDGE';
+        const uniTool = await executeAiTool({
+          toolName: 'getUniversityInfo',
+          studentId: student._id,
+          trackingId: student.trackingId,
+        });
+        toolCallsExecuted.push({ toolName: 'getUniversityInfo', result: uniTool.data, status: 'SUCCESS' });
+        const u = uniTool.data || {};
+        replyContent = `🏛️ **${u.name || 'GIET University (Gandhi Institute of Engineering and Technology)'}**\n\n• **Location**: Gunupur, Rayagada, Odisha (120-acre lush green campus)\n• **Rankings & Accreditations**: NAAC A++ (CGPA 3.78/4.0), NIRF Top 35 Engineering, NBA Tier-1 Accredited\n• **Placements**: 96.4% placement rate, Highest ₹54.2 LPA, Average ₹11.8 LPA\n• **Admissions Helpline**: +91 6857 250172 | admissions@giet.edu`;
       } else {
-        replyContent = `Hello ${student.firstName}! I am your Autonomous Admissions Assistant for Tracking ID **${student.trackingId}**. I can help you check program cutoffs, upload marksheets, verify application status, or connect you with a senior counselor. How may I assist you today?`;
+        replyContent = `Hello ${student.firstName}! I am your Autonomous Admissions Counselor for GIET University. I can help you with degree programs, cutoffs, tuition fees, document verification, or connect you with a senior advisor. What would you like to explore?`;
       }
 
       aiResponseData = {

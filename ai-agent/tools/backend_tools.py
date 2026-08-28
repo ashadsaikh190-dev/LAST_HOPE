@@ -1,5 +1,8 @@
+import logging
 import httpx
 from config import settings
+
+logger = logging.getLogger("admissions_agent.tool_client")
 
 class BackendToolClient:
     def __init__(self):
@@ -8,7 +11,7 @@ class BackendToolClient:
 
     async def execute_tool(self, tool_name: str, parameters: dict = None, student_id: str = None, tracking_id: str = None) -> dict:
         """
-        Executes an authorized backend tool via the Node.js backend API
+        Executes an authorized backend tool via the Node.js Express backend API.
         """
         payload = {
             "toolName": tool_name,
@@ -36,8 +39,10 @@ class BackendToolClient:
                         return inner["data"]
                     return inner
                 else:
+                    logger.warning(f"Backend tool '{tool_name}' error HTTP {response.status_code}: {response.text}")
                     return {"error": f"Backend returned status {response.status_code}: {response.text}"}
         except Exception as e:
+            logger.error(f"Backend tool execution error for '{tool_name}': {e}")
             return {"error": f"Failed to execute backend tool {tool_name}: {str(e)}"}
 
 tool_client = BackendToolClient()

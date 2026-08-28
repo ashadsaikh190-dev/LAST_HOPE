@@ -9,7 +9,7 @@ logger = logging.getLogger("admissions_agent.gemini")
 class GeminiProvider(BaseLLMProvider):
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self._api_key = api_key or settings.GEMINI_API_KEY
-        self._model = model or settings.GEMINI_MODEL or "gemini-3.6-flash"
+        self._model = model or settings.GEMINI_MODEL or "gemini-2.5-flash"
 
     @property
     def provider_name(self) -> str:
@@ -19,7 +19,7 @@ class GeminiProvider(BaseLLMProvider):
         return self._api_key or settings.GEMINI_API_KEY
 
     def get_model(self) -> str:
-        return self._model or settings.GEMINI_MODEL or "gemini-3.6-flash"
+        return self._model or settings.GEMINI_MODEL or "gemini-2.5-flash"
 
     async def is_available(self) -> bool:
         key = self.get_api_key()

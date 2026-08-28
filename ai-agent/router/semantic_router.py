@@ -120,14 +120,19 @@ class AIQueryRouter:
         elif any(w in lower for w in ["enrollment", "roll number", "offer letter", "admission status"]):
             top_cat = QueryCategory.STUDENT_STATUS
             top_score = max(top_score, 0.93)
-        elif any(w in lower for w in ["nirf", "naac", "placement", "highest package", "recruiters", "campus size"]):
+        elif any(w in lower for w in [
+            "nirf", "naac", "placement", "highest package", "recruiters", "campus size",
+            "swimming", "summing pool", "pool", "swim", "aquatic", "water sport",
+            "sports", "gym", "gymnasium", "cricket", "badminton", "football", "fitness",
+            "hostel", "mess", "canteen", "dorm", "library", "facility", "facilities", "campus life"
+        ]):
             top_cat = QueryCategory.UNIVERSITY_KNOWLEDGE
-            top_score = max(top_score, 0.92)
+            top_score = max(top_score, 0.95)
 
         # Step 4: Determine Model & Database routing
         requires_db = top_cat in DATABASE_GROUNDED_CATEGORIES
-        requires_existing_agent = requires_db or top_score < self.confidence_threshold
-        requires_gemini = (top_cat == QueryCategory.GENERAL) and (top_score >= self.confidence_threshold)
+        requires_existing_agent = requires_db
+        requires_gemini = (top_cat == QueryCategory.GENERAL) or not requires_db
 
         logger.info(
             f"Query routed: category={top_cat.value}, confidence={top_score:.2f}, "

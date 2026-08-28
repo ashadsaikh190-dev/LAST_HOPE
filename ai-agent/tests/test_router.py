@@ -54,3 +54,34 @@ def test_agent_general_gemini_routing():
     assert res is not None
     assert "reply" in res
     assert len(res["reply"]) > 20
+
+def test_agent_swimming_pool_query_with_typo():
+    res = asyncio.run(agent.process_student_message(
+        tracking_id="TEST-ADM-2026",
+        message_text="do we have summing pool"
+    ))
+    assert res is not None
+    assert "reply" in res
+    assert "Swimming Pool" in res["reply"] or "swimming pool" in res["reply"].lower()
+    assert "Olympic" in res["reply"]
+    assert "I am here to assist with university admissions, cutoffs, tuition fees" not in res["reply"]
+
+def test_agent_swimming_pool_standard_query():
+    res = asyncio.run(agent.process_student_message(
+        tracking_id="TEST-ADM-2026",
+        message_text="Do we have a swimming pool on campus?"
+    ))
+    assert res is not None
+    assert "reply" in res
+    assert "Swimming Pool" in res["reply"]
+    assert "Olympic" in res["reply"]
+
+def test_agent_sports_query():
+    res = asyncio.run(agent.process_student_message(
+        tracking_id="TEST-ADM-2026",
+        message_text="Tell me about sports, gym, and fitness facilities"
+    ))
+    assert res is not None
+    assert "reply" in res
+    assert "Sports" in res["reply"] or "Gymnasium" in res["reply"]
+

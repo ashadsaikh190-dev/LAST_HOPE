@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import emailjs from '@emailjs/browser';
-import { Mail, X, RotateCcw, Send, CheckCircle2, AlertCircle, Loader2, Settings, ChevronDown, ChevronUp, Key } from 'lucide-react';
+import { Mail, X, RotateCcw, Send, CheckCircle2, AlertCircle, Loader2, Settings, ChevronDown, ChevronUp, Key, ExternalLink, RefreshCw } from 'lucide-react';
 import api from '../../api/axios';
 
 export const EmailStudentModal = ({
@@ -197,14 +197,78 @@ ashadsaikh7@gmail.com`;
       }, 2500);
     } catch (error) {
       console.error('[EmailJS Error]', error);
-      const errorMsg =
+      const rawErrorMsg =
         error?.text ||
         error?.message ||
-        'Unable to send email. Please verify your EmailJS keys and template parameters.';
+        (typeof error === 'string' ? error : 'Unable to send email. Please verify your EmailJS keys and template parameters.');
+      
+      const isInvalidGrant =
+        typeof rawErrorMsg === 'string' &&
+        (rawErrorMsg.toLowerCase().includes('invalid grant') ||
+         rawErrorMsg.toLowerCase().includes('reconnect your gmail'));
+
       setShowConfig(true);
       setFeedback({
         type: 'error',
-        text: `EmailJS Error: ${errorMsg}`,
+        isInvalidGrant,
+        text: isInvalidGrant
+          ? 'Gmail_API: Invalid grant. Your Gmail connection in EmailJS has expired or was revoked by Google. Please reconnect your Gmail account.'
+          : `EmailJS Error: ${rawErrorMsg}`,
+        rawError: rawErrorMsg,
+      });
+    } finally {
+      setSending(false);
+      isSendingRef.current = false;
+    }
+  };
+
+  const handleSendViaBackend = async () => {
+    if (isSendingRef.current || sending) return;
+
+    if (!studentEmail) {
+      setFeedback({
+        type: 'error',
+        text: 'Student email address is not available.',
+      });
+      return;
+    }
+
+    if (!subject.trim() || !message.trim()) {
+      setFeedback({
+        type: 'error',
+        text: 'Subject and message cannot be empty.',
+      });
+      return;
+    }
+
+    isSendingRef.current = true;
+    setSending(true);
+    setFeedback(null);
+
+    try {
+      await api.post(`/counselor/students/${trackingId}/send-email`, {
+        recipientEmail: studentEmail.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+
+      setFeedback({
+        type: 'success',
+        text: `Email dispatched successfully via backend server to ${studentEmail}.`,
+      });
+
+      if (onEmailSent) {
+        onEmailSent();
+      }
+
+      setTimeout(() => {
+        onClose();
+      }, 2500);
+    } catch (err) {
+      console.error('[Backend Send Error]', err);
+      setFeedback({
+        type: 'error',
+        text: err?.response?.data?.message || err?.message || 'Failed to dispatch email via backend.',
       });
     } finally {
       setSending(false);
@@ -239,7 +303,7 @@ ashadsaikh7@gmail.com`;
             type="button"
             onClick={onClose}
             disabled={sending}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -248,19 +312,67 @@ ashadsaikh7@gmail.com`;
 
         {/* Feedback Alert */}
         {feedback && (
-          <div
-            className={`mx-6 mt-4 p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
-              feedback.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                : 'bg-rose-50 border border-rose-200 text-rose-800'
-            }`}
-          >
-            {feedback.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="mx-6 mt-4">
+            {feedback.isInvalidGrant ? (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 shadow-sm space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-amber-950">
+                      Gmail Connection Expired (Invalid Grant)
+                    </h4>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Google OAuth security has expired the Gmail connection in EmailJS. You can reconnect it on EmailJS or send directly via the backend server.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white/80 rounded-xl border border-amber-200/60 text-[11px] text-slate-700 space-y-2">
+                  <p className="font-bold text-slate-800">Quick Fix Options:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                    <li><strong className="text-slate-800">Option 1:</strong> Click <strong className="text-brand-700">"Send via Backend Server"</strong> below to send right now without EmailJS.</li>
+                    <li><strong className="text-slate-800">Option 2:</strong> Reconnect Gmail in EmailJS Dashboard (<code className="font-mono text-brand-700">{serviceId || 'service_sfsai1a'}</code>).</li>
+                  </ol>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSendViaBackend}
+                    disabled={sending || !studentEmail}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send via Backend Server</span>
+                  </button>
+
+                  <a
+                    href="https://dashboard.emailjs.com/admin/services"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <span>Open EmailJS Dashboard</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <div
+                className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
+                  feedback.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-800'
+                }`}
+              >
+                {feedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{feedback.text}</span>
+              </div>
             )}
-            <span>{feedback.text}</span>
           </div>
         )}
 

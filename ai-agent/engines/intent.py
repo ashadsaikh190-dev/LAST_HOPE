@@ -69,6 +69,29 @@ class IntentEngine:
                 r"human", r"counselor", r"talk to someone", r"speak to person", r"representative", r"helpdesk"
             ]
         },
+        "SWIMMING_POOL_QUERY": {
+            "priority": 86,
+            "patterns": [
+                r"summing pool", r"swimming pool", r"swimming", r"pool", r"swim",
+                r"aquatic", r"water sport", r"summing", r"swiming", r"diving pool"
+            ]
+        },
+        "SPORTS_FITNESS_QUERY": {
+            "priority": 80,
+            "patterns": [
+                r"sports", r"sport", r"gym", r"gymnasium", r"fitness", r"badminton",
+                r"cricket", r"football", r"basketball", r"tennis", r"athletic",
+                r"stadium", r"court", r"ground", r"workout"
+            ]
+        },
+        "CAMPUS_FACILITIES": {
+            "priority": 76,
+            "patterns": [
+                r"campus", r"hostel", r"facility", r"facilities", r"dorm", r"accommodation",
+                r"library", r"mess", r"canteen", r"cafeteria", r"wifi", r"wi-fi", r"lab",
+                r"transport", r"bus", r"medical", r"hospital", r"clinic", r"infrastructure"
+            ]
+        },
         "COMPLAINT": {
             "priority": 88,
             "patterns": [

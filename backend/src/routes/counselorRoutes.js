@@ -29,6 +29,7 @@ const { createNotification } = require('../services/notificationService');
 const { EVENTS, dispatchEvent } = require('../services/eventBusService');
 const { calculateStudentIntelligence } = require('../services/intelligenceService');
 const { emitToStudent, emitToCounselors } = require('../config/socket');
+const { sendSesEmail } = require('../services/sesService');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 // Enforce authentication & role protection for all Counselor endpoints
@@ -489,6 +490,50 @@ router.post('/documents/:id/verify-override', protect, async (req, res, next) =>
     }
 
     return sendSuccess(res, document, `Document successfully marked as ${status}`);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/counselor/students/:trackingId/send-email
+ * @desc    Send email via Backend Email Service (Amazon SES or mock dispatcher)
+ */
+router.post('/students/:trackingId/send-email', protect, async (req, res, next) => {
+  try {
+    const { trackingId } = req.params;
+    const { recipientEmail, subject, message } = req.body;
+
+    if (!recipientEmail || !subject || !message) {
+      return sendError(res, 'Recipient email, subject, and message are required', 400);
+    }
+
+    const student = await Student.findOne({ trackingId });
+    if (!student) {
+      return sendError(res, 'Student not found', 404);
+    }
+
+    const emailResult = await sendSesEmail({
+      to: recipientEmail,
+      subject: subject.trim(),
+      textBody: message.trim(),
+      htmlBody: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; white-space: pre-wrap; font-size: 14px;">${message.trim().replace(/\n/g, '<br/>')}</div>`,
+    });
+
+    await dispatchEvent(EVENTS.EMAIL_SENT, {
+      actorId: req.user._id,
+      actorType: req.user.role || 'COUNSELOR',
+      studentId: student._id,
+      trackingId,
+      metadata: {
+        recipientEmail,
+        subject,
+        description: `📧 Email sent via ${emailResult.provider} to ${recipientEmail}`,
+        messageId: emailResult.messageId,
+      },
+    });
+
+    return sendSuccess(res, { provider: emailResult.provider, messageId: emailResult.messageId }, 'Email sent successfully via backend');
   } catch (error) {
     next(error);
   }

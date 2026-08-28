@@ -65,6 +65,8 @@ CATEGORY_ANCHORS: Dict[QueryCategory, List[str]] = {
         "What is the university NIRF ranking and NAAC accreditation score?",
         "Tell me about campus placement statistics, recruiters, and highest package",
         "Tell me about campus facilities, hostels, digital library, and sports arena",
+        "Do we have a swimming pool, sports complex, gymnasium, or aquatic facilities?",
+        "Is there a swimming pool, hostel mess, or cafeteria on campus?",
         "Who is the admissions counselor and how can I contact them?",
     ],
     QueryCategory.GENERAL: [
